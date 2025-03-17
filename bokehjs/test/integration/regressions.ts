@@ -2,23 +2,23 @@ import sinon from "sinon"
 
 import {expect} from "../unit/assertions"
 import {display, fig, row, column, grid, DelayedInternalProvider} from "./_util"
-import {PlotActions, xy, click, press} from "../interactive"
+import {PlotActions, xy, click, press, mouseenter} from "../interactive"
 
+import type {ArrowHead, Renderer, BasicTickFormatter} from "@bokehjs/models"
 import {
-  Arrow, ArrowHead, NormalHead, OpenHead,
+  Arrow, NormalHead, OpenHead,
   BoxAnnotation, LabelSet, ColorBar, Slope, Whisker,
   Range1d, DataRange1d, FactorRange,
   ColumnDataSource, CDSView, BooleanFilter, IndexFilter, Selection,
   LinearAxis, CategoricalAxis,
   GlyphRenderer, GraphRenderer, GridBox,
-  Circle, Quad, MultiLine,
+  Circle, Quad, MultiLine, Text,
   StaticLayoutProvider,
   LinearColorMapper,
   Plot,
   TeX,
   Toolbar, ToolProxy, PanTool, PolySelectTool, LassoSelectTool, HoverTool, ZoomInTool, ZoomOutTool, RangeTool,
   TileRenderer, WMTSTileSource,
-  Renderer,
   ImageURLTexture,
   Row, Column,
   Pane,
@@ -27,7 +27,7 @@ import {
   Jitter,
   ParkMillerLCG,
   GridPlot,
-  BasicTickFormatter,
+  Tooltip,
 } from "@bokehjs/models"
 
 import {
@@ -37,32 +37,37 @@ import {
 
 import {DataTable, TableColumn, DateFormatter} from "@bokehjs/models/widgets/tables"
 
-import {Factor} from "@bokehjs/models/ranges/factor_range"
+import type {Factor} from "@bokehjs/models/ranges/factor_range"
 
-import {Document} from "@bokehjs/document"
-import {Color, Arrayable} from "@bokehjs/core/types"
-import {Anchor, Location, OutputBackend, MarkerType} from "@bokehjs/core/enums"
+import {settings} from "@bokehjs/core/settings"
+import type {Color, Arrayable} from "@bokehjs/core/types"
+import type {Location, OutputBackend} from "@bokehjs/core/enums"
+import {Anchor, MarkerType} from "@bokehjs/core/enums"
 import {subsets, tail} from "@bokehjs/core/util/iterator"
 import {assert} from "@bokehjs/core/util/assert"
-import {isArray} from "@bokehjs/core/util/types"
+import {isArray, isPlainObject} from "@bokehjs/core/util/types"
 import {range, linspace} from "@bokehjs/core/util/array"
 import {ndarray} from "@bokehjs/core/util/ndarray"
 import {Random} from "@bokehjs/core/util/random"
 import {Matrix} from "@bokehjs/core/util/matrix"
-import {paint} from "@bokehjs/core/util/defer"
+import {paint, delay} from "@bokehjs/core/util/defer"
 import {encode_rgba} from "@bokehjs/core/util/color"
 import {Figure, figure, show} from "@bokehjs/api/plotting"
-import {MarkerArgs} from "@bokehjs/api/glyph_api"
+import type {MarkerArgs} from "@bokehjs/api/glyph_api"
 import {Spectral11, turbo, plasma} from "@bokehjs/api/palettes"
 import {div, offset_bbox} from "@bokehjs/core/dom"
-import {XY, LRTB} from "@bokehjs/core/util/bbox"
+import type {XY, LRTB} from "@bokehjs/core/util/bbox"
+import {sprintf} from "@bokehjs/core/util/templating"
 
 import {MathTextView} from "@bokehjs/models/text/math_text"
-import {PlotView} from "@bokehjs/models/plots/plot"
+import type {PlotView} from "@bokehjs/models/plots/plot"
+import {FigureView} from "@bokehjs/models/plots/figure"
 
 import {gridplot} from "@bokehjs/api/gridplot"
 import {f} from "@bokehjs/api/expr"
 import {np} from "@bokehjs/api/linalg"
+
+import {open_picker} from "./widgets"
 
 const n_marker_types = [...MarkerType].length
 
@@ -1853,16 +1858,6 @@ describe("Bug", () => {
     })
   })
 
-  describe("in issue #11930", () => {
-    it("doesn't allow overriding int major axis labels with floats", async () => {
-      const response = await fetch("/assets/json/issue11930.json")
-      const json = await response.json()
-
-      const doc = Document.from_json(json)
-      await display(doc)
-    })
-  })
-
   describe("in issue #9763", () => {
     it("incorrectly merges dissimilar tools of the same type", async () => {
       const tools = "xpan,ypan,xwheel_zoom,ywheel_zoom"
@@ -2900,7 +2895,7 @@ describe("Bug", () => {
         const sx = view.frame.x_scale.compute(xy.x)
         const sy = view.frame.y_scale.compute(xy.y)
         const poly_select_view = view.owner.get_one(poly_select)
-        poly_select_view._tap({type: "tap", sx, sy, ctrl_key: false, shift_key: false, alt_key: false})
+        poly_select_view._tap({type: "tap", sx, sy, modifiers: {ctrl: false, shift: false, alt: false}})
       }
 
       tap({x: 15, y: 15})
@@ -3201,6 +3196,300 @@ describe("Bug", () => {
       ], {toolbar_location: null})
 
       await display(gp)
+    })
+  })
+
+  describe("in issue #12913", () => {
+    it("incorrectly renders webgl lines with very small angular separation", async () => {
+      const x = [0, 0.5, 0.5+1e-8, 0.5, 1]
+      const y = [0.4, 0, 1, 0.4, 0]
+      const line_join = "round"
+      const line_width = 20
+      const line_alpha = 0.8
+      const x_range = new Range1d({start: -0.2, end: 1.2})
+      const y_range = new Range1d({start: -0.2, end: 1.2})
+
+      function make_plot(output_backend: OutputBackend) {
+        const p = fig([150, 150], {output_backend, title: output_backend, x_range, y_range})
+        p.line(x, y, {line_width, line_join, line_alpha})
+        return p
+      }
+
+      const p0 = make_plot("canvas")
+      const p1 = make_plot("webgl")
+
+      await display(row([p0, p1]))
+    })
+  })
+
+  describe("in issue #13104", () => {
+    it("results in a race condition in the layout if lazy_initialize() takes time", async () => {
+      class CustomFigureView extends FigureView {
+        declare model: CustomFigure
+
+        override async lazy_initialize(): Promise<void> {
+          await super.lazy_initialize()
+          await delay(5)
+        }
+      }
+
+      class CustomFigure extends Figure {
+        declare __view_type__: CustomFigureView
+
+        static {
+          this.prototype.default_view = CustomFigureView
+        }
+      }
+
+      const p00 = new CustomFigure()
+      p00.circle([1, 2, 3], [1, 2, 3], {fill_color: "red"})
+      const p01 = new CustomFigure()
+      p01.circle([1, 2, 3], [1, 2, 3], {fill_color: "green"})
+      const p10 = new CustomFigure()
+      p10.circle([1, 2, 3], [1, 2, 3], {fill_color: "blue"})
+      const p11 = new CustomFigure()
+      p11.circle([1, 2, 3], [1, 2, 3], {fill_color: "yellow"})
+
+      const gp = new GridBox({
+        children: [
+          [p00, 0, 0], [p01, 0, 1],
+          [p10, 1, 0], [p11, 1, 1],
+        ],
+      })
+
+      await display(gp)
+    })
+  })
+
+  describe("in issue #13112", () => {
+    it("doesn't allow to render Text glyph when using selection indices", async () => {
+      const p = fig([200, 200])
+
+      const source = new ColumnDataSource({
+        data: {
+          x: [1, 2, 3],
+          y: [2, 5, 8],
+          color: ["blue", "orange", "green"],
+          text: ["A", "B", "C"],
+        },
+        selected: new Selection({indices: [0, 2]}),
+      })
+
+      const selected_glyph = new Circle({x: {field: "x"}, y: {field: "y"}, radius: 0.5, line_color: "red"})
+      const nonselected_glyph = new Circle({x: {field: "x"}, y: {field: "y"}, radius: 0.5, line_color: "white"})
+      p.add_glyph(nonselected_glyph, source, {selection_glyph: selected_glyph, nonselection_glyph: nonselected_glyph})
+
+      const selected_labels = new Text({x: {field: "x"}, y: {field: "y"}, text: {field: "text"}, anchor: "center", text_color: "red"})
+      const nonselected_labels = new Text({x: {field: "x"}, y: {field: "y"}, text: {field: "text"}, anchor: "center", text_color: "white"})
+      p.add_glyph(nonselected_labels, source, {selection_glyph: selected_labels, nonselection_glyph: nonselected_labels})
+
+      await display(p)
+    })
+  })
+
+  describe("in issue #13150", () => {
+    it("doesn't allow correctly render GraphRenderer with output_backend='webgl'", async () => {
+      function plot(output_backend: OutputBackend) {
+        const layout_provider = new StaticLayoutProvider({
+          graph_layout: new Map([
+            [4, [2, 1]],
+            [5, [2, 2]],
+            [6, [3, 1]],
+            [7, [3, 2]],
+          ]),
+        })
+
+        const node_renderer = new GlyphRenderer({
+          glyph: new Circle({size: 10, fill_color: "red"}),
+          data_source: new ColumnDataSource({data: {index: [4, 5, 6, 7]}}),
+        })
+        const edge_renderer = new GlyphRenderer({
+          glyph: new MultiLine({line_width: 2, line_color: "gray"}),
+          data_source: new ColumnDataSource({data: {start: [4, 4, 5, 6], end: [5, 6, 6, 7]}}),
+        })
+
+        const graph = new GraphRenderer({layout_provider, node_renderer, edge_renderer})
+        return fig([200, 200], {output_backend, title: output_backend, renderers: [graph]})
+      }
+
+      const p0 = plot("canvas")
+      const p1 = plot("svg")
+      const p2 = plot("webgl")
+
+      // TODO: MultiLine doesn't support webgl
+      const {force_webgl} = settings
+      settings.force_webgl = false
+      try {
+        await display(row([p0, p1, p2]))
+      } finally {
+        settings.force_webgl = force_webgl
+      }
+    })
+  })
+
+  describe("in issue #12951", () => {
+    it("doesn't allow usage of Tooltip in description context", async () => {
+      const tooltip = new Tooltip({content: "Select widget description.", position: "right"})
+      const widget = new Select({title: "A dropdown", value: "Test", options: ["Test"], description: tooltip})
+      const {doc, view} = await display(widget, [300, 100])
+
+      const doc_json = doc.to_json()
+      expect(isPlainObject(doc_json)).to.be.true
+
+      const {desc_el} = view.owner.get_one(widget)
+      assert(desc_el != null)
+      await mouseenter(desc_el)
+    })
+  })
+
+  describe("in issue #13192", () => {
+    it("doesn't to clear DatePicker.enabled_dates", async () => {
+      const dp = new DatePicker({enabled_dates: ["2023-05-08"], min_date: "2023-05-01", max_date: "2023-05-31"})
+      const {view} = await display(dp, [500, 400])
+      dp.enabled_dates = null
+      await view.ready
+      await open_picker(view)
+    })
+  })
+
+  describe("in issue #13182", () => {
+    it("doesn't allow update of legend when data changes", async () => {
+      const orange = "#ef8a62"
+      const blue = "#67a9cf"
+
+      const data = {
+        x: [1, 2, 3, 4, 5, 6],
+        y: [2, 1, 2, 1, 2, 1],
+        color: [orange, blue, orange, blue, orange, blue],
+        label: ["hi", "lo", "hi", "lo", "hi", "lo"],
+      }
+
+      const data_hi = {
+        x: [1, 3, 5],
+        y: [2, 2, 2],
+        color: [orange, orange, orange],
+        label: ["hi", "hi", "hi"],
+      }
+
+      const source = new ColumnDataSource({data})
+
+      const p = fig([200, 200], {x_range: [0, 7], y_range: [0, 3]})
+      p.circle({field: "x"}, {field: "y"}, {radius: 0.5, color: {field: "color"}, legend_field: "label", source})
+      p.legend.location = "bottom_right"
+
+      const {view} = await display(p)
+
+      source.data = data_hi
+      await view.ready
+    })
+  })
+
+  describe("in issue #12718", () => {
+    it("doesn't render Legend correctly when LegendItem.index is filtered out by CDSView", async () => {
+      const data = {
+        values: [0, 1, 2],
+        type: [0, 1, 2],
+        color: ["red", "blue", "green"],
+      }
+
+      const source = new ColumnDataSource({data})
+      const cds_view = new CDSView()
+
+      const p = fig([200, 200])
+      p.circle({
+        x: {field: "values"},
+        y: {value: 1},
+        fill_color: {field: "color"},
+        size: 20,
+        source,
+        view: cds_view,
+        legend_group: "type",
+      })
+
+      p.legend.orientation = "horizontal"
+      p.legend.location = "top"
+
+      const {view} = await display(p)
+
+      cds_view.filter = new IndexFilter({indices: [1, 2]})
+      await view.ready
+    })
+  })
+
+  describe("in issue #13252", () => {
+    describe("doesn't allow to correctly export GridPlot", () => {
+      function plot(color: Color) {
+        const p = fig([200, 200])
+        const x = range(10)
+        const y = range(10)
+        p.scatter(x, y, {marker: "circle", color})
+        return p
+      }
+
+      function gridplot() {
+        return new GridPlot({
+          children: [
+            [plot("red"),    0, 0],
+            [plot("green"),  0, 1],
+            [plot("blue"),   1, 0],
+            [plot("purple"), 1, 1],
+          ],
+        })
+      }
+
+      // TODO Allow to generate additional baselines for image diff.
+      it.dpr(1)("with devicePixelRatio == 1", async () => {
+        const {view} = await display(gridplot())
+        await view.export("png").to_blob()
+      })
+
+      it.dpr(2)("with devicePixelRatio == 2", async () => {
+        const {view} = await display(gridplot())
+        await view.export("png").to_blob()
+      })
+
+      it.dpr(3)("with devicePixelRatio == 3", async () => {
+        const {view} = await display(gridplot())
+        await view.export("png").to_blob()
+      })
+    })
+  })
+
+  describe("in issue #13255", () => {
+    it("doesn't allow to disable DatePicker after display", async () => {
+      const date_picker = new DatePicker({value: "2023-02-26", width: 100})
+      const {view} = await display(date_picker, [150, 100])
+      date_picker.disabled = true
+      await view.ready
+    })
+  })
+
+  describe("in issue #13262", () => {
+    describe("doesn't allow to correctly compute grid layout in Legend with uneven number of items", () => {
+      function plot() {
+        const x = np.linspace(0, 4*np.pi, 100)
+        const y = np.sin(x)
+
+        const p = fig([450, 200])
+        for (const i of range(7)) {
+          p.line(x, f`${1 + i/20}*${y}`, {legend_label: `${sprintf("%.2f", 1 + i/20)}*sin(x)`})
+        }
+        return p
+      }
+
+      it("in vertical orientation and ncols", async () => {
+        const p = plot()
+        p.legend.orientation = "vertical"
+        p.legend.ncols = 2
+        await display(p)
+      })
+
+      it("in horizontal orientation and nrows", async () => {
+        const p = plot()
+        p.legend.orientation = "horizontal"
+        p.legend.nrows = 2
+        await display(p)
+      })
     })
   })
 })

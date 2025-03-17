@@ -19,7 +19,6 @@ import pytest ; pytest
 # Standard library imports
 import json
 from collections import OrderedDict
-from copy import deepcopy
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -38,7 +37,13 @@ from bokeh.document import Document
 from bokeh.embed.util import RenderRoot, standalone_docs_json
 from bokeh.io import curdoc
 from bokeh.plotting import figure
-from bokeh.resources import CDN, CSSResources, JSResources
+from bokeh.resources import (
+    CDN,
+    Resources,
+    _get_cdn_urls,
+    _get_server_urls,
+)
+from bokeh.settings import settings
 from bokeh.themes import Theme
 
 # Module under test
@@ -123,9 +128,9 @@ class Test_autoload_static:
             test_file_path_and_url: tuple[str, str], test_plot: figure) -> None:
         monkeypatch.setattr(buv, "__version__", "2.0.0")
         monkeypatch.setattr(resources, "__version__", "2.0.0")
-        r = deepcopy(CDN)
+        r = CDN.clone()
         # Skip bokeh-mathjax for older versions
-        r.js_components.remove("bokeh-mathjax")
+        r.components.remove("bokeh-mathjax")
         js, tag = bes.autoload_static(test_plot, r, "some/path")
 
         page = PAGE.render(js=js, tag=tag)
@@ -322,38 +327,6 @@ class Test_file_html:
                           template_variables={"test_var": "test"})
         assert isinstance(r, str)
 
-    @patch('bokeh.embed.bundle.warn')
-    def test_file_html_handles_js_only_resources(self, mock_warn: MagicMock, test_plot: figure) -> None:
-        js_resources = JSResources(mode="absolute", components=["bokeh"])
-        template = Template("<head>{{ bokeh_js }}</head><body></body>")
-        output = bes.file_html(test_plot, (js_resources, None), "title", template=template)
-        html = f"<head>{js_resources.render_js()}</head><body></body>"
-        assert output == html
-
-    @patch('bokeh.embed.bundle.warn')
-    def test_file_html_provides_warning_if_no_css(self, mock_warn: MagicMock, test_plot: figure) -> None:
-        js_resources = JSResources()
-        bes.file_html(test_plot, (js_resources, None), "title")
-        mock_warn.assert_called_once_with(
-            'No Bokeh CSS Resources provided to template. If required you will need to provide them manually.'
-        )
-
-    @patch('bokeh.embed.bundle.warn')
-    def test_file_html_handles_css_only_resources(self, mock_warn: MagicMock, test_plot: figure) -> None:
-        css_resources = CSSResources(mode="relative", components=["bokeh"])
-        template = Template("<head>{{ bokeh_css }}</head><body></body>")
-        output = bes.file_html(test_plot, (None, css_resources), "title", template=template)
-        html = f"<head>{css_resources.render_css()}</head><body></body>"
-        assert output == html
-
-    @patch('bokeh.embed.bundle.warn')
-    def test_file_html_provides_warning_if_no_js(self, mock_warn: MagicMock, test_plot: figure) -> None:
-        css_resources = CSSResources()
-        bes.file_html(test_plot, (None, css_resources), "title")
-        mock_warn.assert_called_once_with(
-            'No Bokeh JS Resources provided to template. If required you will need to provide them manually.'
-        )
-
     def test_file_html_title_is_escaped(self, test_plot: figure) -> None:
         r = bes.file_html(test_plot, CDN, "&<")
         assert "<title>&amp;&lt;</title>" in r
@@ -374,6 +347,51 @@ class Test_file_html:
 
         # this is a very coarse test but it will do
         assert "bokeh-widgets" not in out
+
+    def test_empty_document(self) -> None:
+        doc = Document()
+        with pytest.raises(ValueError, match="Document has no root Models"):
+            bes.file_html(doc, CDN)
+
+    def test_resources(self, test_plot: figure) -> None:
+        [cdn_url] = _get_cdn_urls(minified=True).urls(["bokeh"], "js")
+        [server_url] = _get_server_urls(minified=False).urls(["bokeh"], "js")
+
+        html0 = bes.file_html(test_plot, resources=None)
+        assert cdn_url in html0
+
+        html1 = bes.file_html(test_plot, resources=CDN)
+        assert cdn_url in html1
+
+        html2 = bes.file_html(test_plot, resources="cdn")
+        assert cdn_url in html2
+
+        html3 = bes.file_html(test_plot, resources=Resources(mode="server-dev"))
+        assert server_url in html3
+
+        html4 = bes.file_html(test_plot, resources="server-dev")
+        assert server_url in html4
+
+        settings.resources = "server-dev"
+        try:
+            html5 = bes.file_html(test_plot, resources=None)
+            assert server_url in html5
+        finally:
+            del settings.resources
+
+        settings.resources = "server-dev"
+        try:
+            html6 = bes.file_html(test_plot, resources=CDN)
+            assert cdn_url in html6 and server_url not in html6
+        finally:
+            del settings.resources
+
+        settings.resources = "server-dev"
+        try:
+            html7 = bes.file_html(test_plot, resources="cdn")
+            assert cdn_url in html7 and server_url not in html7
+        finally:
+            del settings.resources
 
 JSON_ITEMS_KEYS = {"target_id", "root_id", "doc", "version"}
 

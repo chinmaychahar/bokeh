@@ -38,7 +38,7 @@ def clustering(X, algorithm, n_clusters):
 
     # Generate the new colors:
     if algorithm=='MiniBatchKMeans':
-        model = cluster.MiniBatchKMeans(n_clusters=n_clusters)
+        model = cluster.MiniBatchKMeans(n_clusters=n_clusters, n_init=3)
 
     elif algorithm=='Birch':
         model = cluster.Birch(n_clusters=n_clusters)
@@ -121,14 +121,14 @@ clustering_algorithms= [
     'Ward',
     'AgglomerativeClustering',
     'DBSCAN',
-    'Birch'
+    'Birch',
 ]
 
 datasets_names = [
     'Noisy Circles',
     'Noisy Moons',
     'Blobs',
-    'No Structure'
+    'No Structure',
 ]
 
 algorithm_select = Select(value='MiniBatchKMeans',

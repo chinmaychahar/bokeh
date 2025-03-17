@@ -170,12 +170,19 @@
     url: "http://",
     same_tab: false,
   },
-  CustomJS: {
+  CustomCode: {
     __extends__: "Callback",
+  },
+  CustomJS: {
+    __extends__: "CustomCode",
     args: {
       type: "map",
     },
-    code: "",
+    code: {
+      type: "symbol",
+      name: "unset",
+    },
+    module: "auto",
   },
   SetValue: {
     __extends__: "Callback",
@@ -2701,6 +2708,224 @@
       type: "map",
     },
   },
+  HSpan: {
+    __extends__: "LineGlyph",
+    y: {
+      type: "field",
+      field: "y",
+    },
+    line_color: {
+      type: "value",
+      value: "black",
+    },
+    line_alpha: {
+      type: "value",
+      value: 1.0,
+    },
+    line_width: {
+      type: "value",
+      value: 1,
+    },
+    line_join: {
+      type: "value",
+      value: "bevel",
+    },
+    line_cap: {
+      type: "value",
+      value: "butt",
+    },
+    line_dash: {
+      type: "value",
+      value: [],
+    },
+    line_dash_offset: {
+      type: "value",
+      value: 0,
+    },
+  },
+  VSpan: {
+    __extends__: "LineGlyph",
+    x: {
+      type: "field",
+      field: "x",
+    },
+    line_color: {
+      type: "value",
+      value: "black",
+    },
+    line_alpha: {
+      type: "value",
+      value: 1.0,
+    },
+    line_width: {
+      type: "value",
+      value: 1,
+    },
+    line_join: {
+      type: "value",
+      value: "bevel",
+    },
+    line_cap: {
+      type: "value",
+      value: "butt",
+    },
+    line_dash: {
+      type: "value",
+      value: [],
+    },
+    line_dash_offset: {
+      type: "value",
+      value: 0,
+    },
+  },
+  HStrip: {
+    __extends__: [
+      "LineGlyph",
+      "FillGlyph",
+      "HatchGlyph",
+    ],
+    y0: {
+      type: "field",
+      field: "y0",
+    },
+    y1: {
+      type: "field",
+      field: "y1",
+    },
+    line_color: {
+      type: "value",
+      value: "black",
+    },
+    line_alpha: {
+      type: "value",
+      value: 1.0,
+    },
+    line_width: {
+      type: "value",
+      value: 1,
+    },
+    line_join: {
+      type: "value",
+      value: "bevel",
+    },
+    line_cap: {
+      type: "value",
+      value: "butt",
+    },
+    line_dash: {
+      type: "value",
+      value: [],
+    },
+    line_dash_offset: {
+      type: "value",
+      value: 0,
+    },
+    fill_color: {
+      type: "value",
+      value: "gray",
+    },
+    fill_alpha: {
+      type: "value",
+      value: 1.0,
+    },
+    hatch_color: {
+      type: "value",
+      value: "black",
+    },
+    hatch_alpha: {
+      type: "value",
+      value: 1.0,
+    },
+    hatch_scale: {
+      type: "value",
+      value: 12.0,
+    },
+    hatch_pattern: {
+      type: "value",
+      value: null,
+    },
+    hatch_weight: {
+      type: "value",
+      value: 1.0,
+    },
+    hatch_extra: {
+      type: "map",
+    },
+  },
+  VStrip: {
+    __extends__: [
+      "LineGlyph",
+      "FillGlyph",
+      "HatchGlyph",
+    ],
+    x0: {
+      type: "field",
+      field: "x0",
+    },
+    x1: {
+      type: "field",
+      field: "x1",
+    },
+    line_color: {
+      type: "value",
+      value: "black",
+    },
+    line_alpha: {
+      type: "value",
+      value: 1.0,
+    },
+    line_width: {
+      type: "value",
+      value: 1,
+    },
+    line_join: {
+      type: "value",
+      value: "bevel",
+    },
+    line_cap: {
+      type: "value",
+      value: "butt",
+    },
+    line_dash: {
+      type: "value",
+      value: [],
+    },
+    line_dash_offset: {
+      type: "value",
+      value: 0,
+    },
+    fill_color: {
+      type: "value",
+      value: "gray",
+    },
+    fill_alpha: {
+      type: "value",
+      value: 1.0,
+    },
+    hatch_color: {
+      type: "value",
+      value: "black",
+    },
+    hatch_alpha: {
+      type: "value",
+      value: 1.0,
+    },
+    hatch_scale: {
+      type: "value",
+      value: 12.0,
+    },
+    hatch_pattern: {
+      type: "value",
+      value: null,
+    },
+    hatch_weight: {
+      type: "value",
+      value: 1.0,
+    },
+    hatch_extra: {
+      type: "map",
+    },
+  },
   LabelingPolicy: {
     __extends__: "Model",
   },
@@ -3179,6 +3404,7 @@
     },
     axis_label: null,
     axis_label_standoff: 5,
+    axis_label_orientation: "parallel",
     axis_label_text_color: "#444444",
     axis_label_text_outline_color: null,
     axis_label_text_alpha: 1.0,
@@ -5252,6 +5478,7 @@
     dimensions: "both",
     maintain_focus: true,
     zoom_on_axis: true,
+    zoom_together: "all",
     speed: 0.0016666666666666668,
   },
   CustomAction: {
@@ -5276,6 +5503,9 @@
     ],
     behavior: "select",
     gesture: "tap",
+    modifiers: {
+      type: "map",
+    },
     callback: null,
   },
   CrosshairTool: {
@@ -5314,13 +5544,17 @@
     match_aspect: false,
     origin: "corner",
   },
-  ZoomInTool: {
+  ZoomBaseTool: {
     __extends__: "PlotActionTool",
+    renderers: "auto",
+  },
+  ZoomInTool: {
+    __extends__: "ZoomBaseTool",
     dimensions: "both",
     factor: 0.1,
   },
   ZoomOutTool: {
-    __extends__: "PlotActionTool",
+    __extends__: "ZoomBaseTool",
     dimensions: "both",
     factor: 0.1,
     maintain_focus: true,
@@ -5446,7 +5680,7 @@
   HelpTool: {
     __extends__: "ActionTool",
     description: "Click the question mark to learn more about Bokeh plot tools.",
-    redirect: "https://docs.bokeh.org/en/latest/docs/user_guide/tools.html",
+    redirect: "https://docs.bokeh.org/en/latest/docs/user_guide/interaction/tools.html",
   },
   ExamineTool: {
     __extends__: "ActionTool",
@@ -5731,6 +5965,7 @@
   },
   Widget: {
     __extends__: "LayoutDOM",
+    margin: 5,
   },
   ButtonLike: {
     button_type: "default",
@@ -5888,6 +6123,7 @@
     min_characters: 2,
     case_sensitive: true,
     restrict: true,
+    search_strategy: "starts_with",
   },
   Select: {
     __extends__: "InputWidget",

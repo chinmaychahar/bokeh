@@ -1,17 +1,19 @@
-import {Axis, AxisView, Extents, TickCoords, Coords} from "./axis"
+import type {Extents, TickCoords, Coords} from "./axis"
+import {Axis, AxisView} from "./axis"
 
 import {CategoricalTicker} from "../tickers/categorical_ticker"
 import {CategoricalTickFormatter} from "../formatters/categorical_tick_formatter"
-import {FactorRange, Factor, L1Factor, L2Factor, L3Factor} from "../ranges/factor_range"
+import type {FactorRange, Factor, L1Factor, L2Factor, L3Factor} from "../ranges/factor_range"
 
-import * as visuals from "core/visuals"
+import type * as visuals from "core/visuals"
 import * as mixins from "core/property_mixins"
-import * as p from "core/properties"
-import {TickLabelOrientation} from "core/enums"
-import {GraphicsBox, GraphicsBoxes, TextBox} from "core/graphics"
-import {Context2d} from "core/util/canvas"
+import type * as p from "core/properties"
+import {LabelOrientation} from "core/enums"
+import type {GraphicsBox} from "core/graphics"
+import {GraphicsBoxes, TextBox} from "core/graphics"
+import type {Context2d} from "core/util/canvas"
 import {isString} from "core/util/types"
-import {Orient} from "core/layout/side_panel"
+import type {Orient} from "core/layout/side_panel"
 
 export type CategoricalTickCoords = TickCoords & {
   mids: Coords
@@ -161,8 +163,8 @@ export namespace CategoricalAxis {
   export type Props = Axis.Props & {
     ticker: p.Property<CategoricalTicker>
     formatter: p.Property<CategoricalTickFormatter>
-    group_label_orientation: p.Property<TickLabelOrientation | number>
-    subgroup_label_orientation: p.Property<TickLabelOrientation | number>
+    group_label_orientation: p.Property<LabelOrientation | number>
+    subgroup_label_orientation: p.Property<LabelOrientation | number>
   } & Mixins
 
   export type Mixins =
@@ -200,8 +202,8 @@ export class CategoricalAxis extends Axis {
     ])
 
     this.define<CategoricalAxis.Props>(({Number, Or}) => ({
-      group_label_orientation:    [ Or(TickLabelOrientation, Number), "parallel" ],
-      subgroup_label_orientation: [ Or(TickLabelOrientation, Number), "parallel" ],
+      group_label_orientation:    [ Or(LabelOrientation, Number), "parallel" ],
+      subgroup_label_orientation: [ Or(LabelOrientation, Number), "parallel" ],
     }))
 
     this.override<CategoricalAxis.Props>({

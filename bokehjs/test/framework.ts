@@ -1,13 +1,14 @@
 import "./setup"
 
-import {UIElement, UIElementView} from "@bokehjs/models/ui/ui_element"
-import {View} from "@bokehjs/core/view"
+import type {UIElement} from "@bokehjs/models/ui/ui_element"
+import {UIElementView} from "@bokehjs/models/ui/ui_element"
+import type {View} from "@bokehjs/core/view"
 import {LayoutDOM} from "@bokehjs/models/layouts/layout_dom"
 import {show} from "@bokehjs/api/plotting"
 import {Document} from "@bokehjs/document"
-import {HasProps} from "@bokehjs/core/has_props"
+import type {HasProps} from "@bokehjs/core/has_props"
 import {div, empty, offset_bbox} from "@bokehjs/core/dom"
-import {ViewOf} from "@bokehjs/core/view"
+import type {ViewOf} from "@bokehjs/core/view"
 import {isNumber, isString, isArray, isPlainObject} from "@bokehjs/core/util/types"
 import {entries} from "@bokehjs/core/util/object"
 import {assert, unreachable} from "@bokehjs/core/util/assert"
@@ -19,15 +20,23 @@ export function set_ready(fn: () => Promise<void>): void {
   ready = fn
 }
 
+type TestRunContext = {
+  chromium_version: number
+}
+
 export type Func = () => void
 export type AsyncFunc = () => Promise<void>
+
+export type ItFunc = (ctx: TestRunContext) => void
+export type ItAsyncFunc = (ctx: TestRunContext) => Promise<void>
 
 export type Decl = {
   fn: Func | AsyncFunc
   description?: string
 }
 
-export type Test = Decl & {
+export type Test = {
+  fn: ItFunc | ItAsyncFunc
   description: string
   skip: boolean
   views: View[]
@@ -36,6 +45,7 @@ export type Test = Decl & {
   threshold?: number
   retries?: number
   dpr?: number
+  no_image?: boolean
 }
 
 export type Suite = {
@@ -60,15 +70,16 @@ export function describe(description: string, fn: Func/* | AsyncFunc*/): void {
   }
 }
 
-type ItFn = (description: string, fn: Func | AsyncFunc) => Test
+type ItFn = (description: string, fn: ItFunc | ItAsyncFunc) => Test
 type _It = ItFn & {
   skip: ItFn
   allowing: (settings: number | TestSettings) => ItFn
   dpr: (dpr: number) => ItFn
+  no_image: ItFn
 }
 
-function _it(description: string, fn: Func | AsyncFunc, skip: boolean): Test {
-  const test = {description, fn, skip, views: []}
+function _it(description: string, fn: ItFunc | ItAsyncFunc, skip: boolean, no_image: boolean = false): Test {
+  const test: Test = {description, fn, skip, views: [], no_image}
   stack[0].tests.push(test)
   return test
 }
@@ -79,7 +90,7 @@ export type TestSettings = {
 }
 
 export function allowing(settings: number | TestSettings): ItFn {
-  return (description: string, fn: Func | AsyncFunc): Test => {
+  return (description: string, fn: ItFunc | ItAsyncFunc): Test => {
     const test = it(description, fn)
     if (isNumber(settings)) {
       test.threshold = settings
@@ -92,23 +103,28 @@ export function allowing(settings: number | TestSettings): ItFn {
 }
 
 export function dpr(dpr: number): ItFn {
-  return (description: string, fn: Func | AsyncFunc): Test => {
+  return (description: string, fn: ItFunc | ItAsyncFunc): Test => {
     const test = it(description, fn)
     test.dpr = dpr
     return test
   }
 }
 
-export function skip(description: string, fn: Func | AsyncFunc): Test {
+export function skip(description: string, fn: ItFunc | ItAsyncFunc): Test {
   return _it(description, fn, true)
 }
 
-export const it: _It = ((description: string, fn: Func | AsyncFunc): Test => {
+export function no_image(description: string, fn: ItFunc | ItAsyncFunc): Test {
+  return _it(description, fn, false, true)
+}
+
+export const it: _It = ((description: string, fn: ItFunc | ItAsyncFunc): Test => {
   return _it(description, fn, false)
 }) as _It
 it.skip = skip
 it.allowing = allowing
 it.dpr = dpr
+it.no_image = no_image
 
 export function before_each(fn: Func | AsyncFunc): void {
   stack[0].before_each.push({fn})
@@ -174,7 +190,7 @@ export async function* yield_all(query?: string | string[] | RegExp): AsyncGener
       continue
     }
 
-    yield await _run_test(parents, test)
+    yield await _run_test(parents, test, {chromium_version: 0}) // XXX chromium_version
   }
 }
 
@@ -208,9 +224,9 @@ function _handle_error(err: Error | null): {str: string, stack?: string} | null 
   return err == null ? null : {str: err.toString(), stack: err.stack}
 }
 
-export async function run(seq: TestSeq): Promise<Result> {
+export async function run(seq: TestSeq, ctx: TestRunContext): Promise<Result> {
   const [suites, test] = from_seq(seq)
-  const result = await _run_test(suites, test)
+  const result = await _run_test(suites, test, ctx)
   return {...result, error: _handle_error(result.error)}
 }
 
@@ -269,7 +285,7 @@ function _resolve_bbox(val: unknown): unknown {
   }
 }
 
-async function _run_test(suites: Suite[], test: Test): Promise<PartialResult> {
+async function _run_test(suites: Suite[], test: Test, ctx: TestRunContext): Promise<PartialResult> {
   const {fn} = test
   const start = Date.now()
   let error: Error | null = null
@@ -286,7 +302,7 @@ async function _run_test(suites: Suite[], test: Test): Promise<PartialResult> {
     }
 
     try {
-      await fn()
+      await fn(ctx)
       await ready()
     } catch (err) {
       error = err instanceof Error ? err : new Error(`${err}`)
@@ -325,11 +341,14 @@ async function _run_test(suites: Suite[], test: Test): Promise<PartialResult> {
   return {error, time}
 }
 
-export async function display(obj: Document, viewport?: [number, number] | "auto" | null, el?: HTMLElement | null): Promise<{views: ViewOf<HasProps>[], el: HTMLElement}>
-export async function display<T extends UIElement>(obj: T, viewport?: [number, number] | "auto" | null, el?: HTMLElement | null): Promise<{view: ViewOf<T>, el: HTMLElement}>
+type DisplayMultiple = {views: ViewOf<HasProps>[], doc: Document, el: HTMLElement}
+type DisplaySingle<T extends UIElement> = {view: ViewOf<T>, doc: Document, el: HTMLElement}
+
+export async function display(obj: Document, viewport?: [number, number] | "auto" | null, el?: HTMLElement | null): Promise<DisplayMultiple>
+export async function display<T extends UIElement>(obj: T, viewport?: [number, number] | "auto" | null, el?: HTMLElement | null): Promise<DisplaySingle<T>>
 
 export async function display(obj: Document | UIElement, viewport: [number, number] | "auto" | null = "auto",
-    el?: HTMLElement | null): Promise<{view: ViewOf<HasProps>, el: HTMLElement} | {views: ViewOf<HasProps>[], el: HTMLElement}> {
+    el?: HTMLElement | null): Promise<DisplaySingle<UIElement> | DisplayMultiple> {
   const test = current_test
   assert(test != null, "display() must be called in it(...) or before*() blocks")
 
@@ -379,9 +398,9 @@ export async function display(obj: Document | UIElement, viewport: [number, numb
   test.el = viewport_el
   test.viewport = size ?? undefined
   if (obj instanceof Document)
-    return {views: test.views, el: viewport_el}
+    return {views: test.views, doc, el: viewport_el}
   else
-    return {view: test.views[0], el: viewport_el}
+    return {view: test.views[0] as UIElementView, doc, el: viewport_el}
 }
 
 export async function compare_on_dom(fn: (ctx: CanvasRenderingContext2D) => void, svg: SVGSVGElement, {width, height}: {width: number, height: number}): Promise<void> {
@@ -401,7 +420,7 @@ export async function compare_on_dom(fn: (ctx: CanvasRenderingContext2D) => void
 }
 
 import {sum} from "@bokehjs/core/util/array"
-import {Size} from "@bokehjs/core/layout"
+import type {Size} from "@bokehjs/core/layout"
 import {Row, Column, GridBox} from "@bokehjs/models/layouts"
 import {Toolbar} from "@bokehjs/models/tools/toolbar"
 import {GridPlot} from "@bokehjs/models/plots"
@@ -503,7 +522,8 @@ function _infer_layoutdom_viewport(obj: LayoutDOM): Size {
   return {width, height}
 }
 
-import {Figure, figure} from "@bokehjs/api/plotting"
+import type {Figure} from "@bokehjs/api/plotting"
+import {figure} from "@bokehjs/api/plotting"
 
 export function fig([width, height]: [number, number], attrs?: Partial<Figure.Attrs>): Figure {
   return figure({width, height, title: null, toolbar_location: null, ...attrs})

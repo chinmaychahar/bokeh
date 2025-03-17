@@ -1,18 +1,20 @@
-import {Tile} from "./tile_source"
-import {Extent, Bounds} from "./tile_utils"
+import type {Tile} from "./tile_source"
+import type {Extent, Bounds} from "./tile_utils"
 import {TileSource} from "./tile_source"
 import {WMTSTileSource} from "./wmts_tile_source"
 import {Renderer, RendererView} from "../renderers/renderer"
-import {Plot} from "../plots/plot"
-import {CartesianFrame} from "../canvas/cartesian_frame"
-import {Range} from "../ranges/range"
+import type {Plot} from "../plots/plot"
+import type {CartesianFrame} from "../canvas/cartesian_frame"
+import type {Range} from "../ranges/range"
 import {Range1d} from "../ranges/range1d"
 import {div, remove, InlineStyleSheet} from "core/dom"
-import * as p from "core/properties"
-import {Image, ImageLoader} from "core/util/image"
+import type * as p from "core/properties"
+import type {Image} from "core/util/image"
+import {ImageLoader} from "core/util/image"
 import {includes} from "core/util/array"
 import {isString} from "core/util/types"
-import {Context2d} from "core/util/canvas"
+import type {Context2d} from "core/util/canvas"
+import {assert} from "core/util/assert"
 
 import attribution_css from "styles/attribution.css"
 
@@ -29,7 +31,7 @@ export type TileData = Tile & ({img: Image, loaded: true} | {img: undefined, loa
 export class TileRendererView extends RendererView {
   declare model: TileRenderer
 
-  protected _tiles: TileData[]
+  protected _tiles: TileData[] | null = null
 
   protected extent: Extent
   protected initial_extent: Extent
@@ -41,9 +43,9 @@ export class TileRendererView extends RendererView {
 
   protected attribution_el?: HTMLElement
 
-  override initialize(): void {
+  override mark_finished(): void {
+    super.mark_finished()
     this._tiles = []
-    super.initialize()
   }
 
   override connect_signals(): void {
@@ -59,7 +61,16 @@ export class TileRendererView extends RendererView {
   }
 
   get_extent(): Extent {
-    return [this.x_range.start, this.y_range.start, this.x_range.end, this.y_range.end]
+    const {x_range, y_range} = this
+    const x_start = x_range.start
+    const y_start = y_range.start
+    const x_end = x_range.end
+    const y_end = y_range.end
+    assert(isFinite(x_start))
+    assert(isFinite(y_start))
+    assert(isFinite(x_end))
+    assert(isFinite(y_end))
+    return [x_start, y_start, x_end, y_end]
   }
 
   private get map_plot(): Plot {
@@ -165,6 +176,8 @@ export class TileRendererView extends RendererView {
     }
 
     this.model.tile_source.tiles.set(cache_key, tile)
+    if (this._tiles == null)
+      this._tiles = []
     this._tiles.push(tile)
 
     new ImageLoader(src, {
@@ -201,7 +214,7 @@ export class TileRendererView extends RendererView {
     if (!super.has_finished())
       return false
 
-    if (this._tiles.length == 0)
+    if (this._tiles == null)
       return false
 
     for (const tile of this._tiles) {

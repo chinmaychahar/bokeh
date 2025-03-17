@@ -111,7 +111,7 @@ def is_datetime_type(obj: Any) -> TypeGuard[dt.time | dt.datetime | np.datetime6
     ''' Whether an object is any date, time, or datetime type recognized by
     Bokeh.
 
-    Arg:
+    Args:
         obj (object) : the object to test
 
     Returns:
@@ -125,7 +125,7 @@ def is_datetime_type(obj: Any) -> TypeGuard[dt.time | dt.datetime | np.datetime6
 def is_timedelta_type(obj: Any) -> TypeGuard[dt.timedelta | np.timedelta64]:
     ''' Whether an object is any timedelta type recognized by Bokeh.
 
-    Arg:
+    Args:
         obj (object) : the object to test
 
     Returns:
@@ -150,7 +150,7 @@ def convert_timedelta_type(obj: dt.timedelta | np.timedelta64) -> float:
     ''' Convert any recognized timedelta value to floating point absolute
     milliseconds.
 
-    Arg:
+    Args:
         obj (object) : the object to convert
 
     Returns:
@@ -169,7 +169,7 @@ def convert_datetime_type(obj: Any | pd.Timestamp | pd.Timedelta | dt.datetime |
     ''' Convert any recognized date, time, or datetime value to floating point
     milliseconds since epoch.
 
-    Arg:
+    Args:
         obj (object) : the object to convert
 
     Returns:
@@ -289,7 +289,7 @@ def make_globally_unique_css_safe_id() -> ID:
         str
 
     '''
-    max_iter = 10
+    max_iter = 100
 
     for _i in range(0, max_iter):
         id = make_globally_unique_id()

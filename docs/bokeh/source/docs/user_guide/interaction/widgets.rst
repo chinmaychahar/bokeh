@@ -81,6 +81,11 @@ AutocompleteInput
 The AutocompleteInput widget is a general-purpose text input widget that uses
 a list of possible inputs to provide autocomplete while typing.
 
+The default value for ``search_strategy`` property is ``"starts_with"``, which
+will match against the start of the possible inputs. Changing ``search_strategy``
+to ``"includes"`` means that matches against any substring of the possible inputs
+will be shown:
+
 .. bokeh-plot:: __REPO__/examples/interaction/widgets/autocompleteinput.py
     :source-position: below
 
@@ -322,7 +327,7 @@ clicked.
 Similar to the :ref:`ug_interaction_widgets_examples_button` widget, the
 dropdown button can also use an :class:`~bokeh.models.Icon` (such as
 :class:`~bokeh.models.BuiltinIcon`, :class:`~bokeh.models.SVGIcon`, or
-:class:`~bokeh.models.TablerIcon`).`
+:class:`~bokeh.models.TablerIcon`).
 
 More information can be found in the reference guide entry for |Dropdown|.
 
@@ -556,7 +561,7 @@ The toggle button holds an on/off state:
 Like with a standard :ref:`ug_interaction_widgets_examples_button`
 widget, the toggle button can also use an :class:`~bokeh.models.Icon` (such as
 :class:`~bokeh.models.BuiltinIcon`, :class:`~bokeh.models.SVGIcon`, or
-:class:`~bokeh.models.TablerIcon`).`
+:class:`~bokeh.models.TablerIcon`).
 
 More information can be found in the reference guide entry for |Toggle|.
 

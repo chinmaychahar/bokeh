@@ -115,6 +115,8 @@ __all__ = (
     'HorizontalLocation',
     'ImageOrigin',
     'JitterRandomDistribution',
+    'KeyModifier',
+    'LabelOrientation',
     'LatLon',
     'LegendClickPolicy',
     'LegendLocation',
@@ -145,7 +147,6 @@ __all__ = (
     'TextAlign',
     'TextBaseline',
     'TextureRepetition',
-    'TickLabelOrientation',
     'ToolIcon',
     'TooltipAttachment',
     'TooltipFieldFormatter',
@@ -374,6 +375,14 @@ ImageOrigin = enumeration("bottom_left", "top_left", "bottom_right", "top_right"
 JitterRandomDistributionType = Literal["uniform", "normal"]
 JitterRandomDistribution = enumeration(JitterRandomDistributionType)
 
+#:
+KeyModifier = Literal["shift", "ctrl", "alt"]
+KeyModifier = enumeration("shift", "ctrl", "alt")
+
+#: Specify how labels are oriented with respect to an axis
+LabelOrientationType = Literal["horizontal", "vertical", "parallel", "normal"]
+LabelOrientation = enumeration("horizontal", "vertical", "parallel", "normal")
+
 #: Specify whether a dimension or coordinate is latitude or longitude
 LatLon = enumeration("lat", "lon")
 
@@ -405,7 +414,7 @@ MarkerType = enumeration(
     "circle_y", "cross", "dash", "diamond", "diamond_cross", "diamond_dot",
     "dot", "hex", "hex_dot", "inverted_triangle", "plus", "square",
     "square_cross", "square_dot", "square_pin", "square_x", "star", "star_dot",
-    "triangle", "triangle_dot", "triangle_pin", "x", "y"
+    "triangle", "triangle_dot", "triangle_pin", "x", "y",
 )
 
 #: Specify one of the CSS4 named colors (https://www.w3.org/TR/css-color-4/#named-colors)
@@ -475,9 +484,6 @@ TextBaseline = enumeration("top", "middle", "bottom", "alphabetic", "hanging", "
 
 #: Specify how textures used as canvas patterns should repeat
 TextureRepetition = enumeration("repeat", "repeat_x", "repeat_y", "no_repeat")
-
-#: Specify how axis tick labels are oriented with respect to the axis
-TickLabelOrientation = enumeration("horizontal", "vertical", "parallel", "normal")
 
 #: Well known tool icon names
 ToolIcon = enumeration(

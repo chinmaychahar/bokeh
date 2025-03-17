@@ -6,9 +6,7 @@
 #-----------------------------------------------------------------------------
 ''' Define a simple web server for testing purpose.
 
-Used for serves the testing html pages that are needed by the webdriver unit
-tests.
-
+Serve html pages that are needed by the webdriver unit tests.
 '''
 
 #-----------------------------------------------------------------------------
@@ -29,7 +27,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.request import URLopener
+from urllib.request import urlopen
 
 # External imports
 import pytest
@@ -110,7 +108,7 @@ class SimpleWebServer:
         self.stop_serving = True
         try:
             # This is to force stop the server loop
-            URLopener().open(f"http://{self.host}:{self.port}")
+            urlopen(f"http://{self.host}:{self.port}")
         except OSError:
             pass
         log.info("Shutting down the webserver")

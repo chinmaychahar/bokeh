@@ -1,12 +1,14 @@
-import {XYGlyph, XYGlyphView, XYGlyphData} from "./xy_glyph"
+import type {XYGlyphData} from "./xy_glyph"
+import {XYGlyph, XYGlyphView} from "./xy_glyph"
 import {generic_line_scalar_legend} from "./utils"
 import * as mixins from "core/property_mixins"
-import * as visuals from "core/visuals"
-import * as p from "core/properties"
-import {Rect} from "core/types"
+import type * as visuals from "core/visuals"
+import type * as p from "core/properties"
+import type {Rect} from "core/types"
 import {StepMode} from "core/enums"
-import {Context2d} from "core/util/canvas"
+import type {Context2d} from "core/util/canvas"
 import {unreachable} from "core/util/assert"
+import type {StepGL} from "./webgl/step"
 
 export type StepData = XYGlyphData
 
@@ -17,16 +19,11 @@ export class StepView extends XYGlyphView {
   declare visuals: Step.Visuals
 
   /** @internal */
-  declare glglyph?: import("./webgl/step").StepGL
+  declare glglyph?: StepGL
 
-  override async lazy_initialize(): Promise<void> {
-    await super.lazy_initialize()
-
-    const {webgl} = this.renderer.plot_view.canvas_view
-    if (webgl != null && webgl.regl_wrapper.has_webgl) {
-      const {StepGL} = await import("./webgl/step")
-      this.glglyph = new StepGL(webgl.regl_wrapper, this)
-    }
+  override async load_glglyph() {
+    const {StepGL} = await import("./webgl/step")
+    return StepGL
   }
 
   protected _render(ctx: Context2d, indices: number[], data?: StepData): void {

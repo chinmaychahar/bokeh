@@ -56,7 +56,7 @@ from ..core.properties import (
     Nullable,
     String,
 )
-from ..resources import DEFAULT_SERVER_PORT
+from ..resources import DEFAULT_SERVER_PORT, server_url
 from ..util.options import Options
 from .tornado import DEFAULT_WEBSOCKET_MAX_MESSAGE_SIZE_BYTES, BokehTornado
 from .util import bind_sockets, create_hosts_allowlist
@@ -96,8 +96,6 @@ class BaseServer:
     initialize the ``BokehTornado`` instance on the ``io_loop``. The
     ``http_server`` must have been previously created and initialized with the
     ``BokehTornado`` instance.
-
-    .. autoclasstoc::
 
     '''
 
@@ -348,8 +346,6 @@ class Server(BaseServer):
     at the same time. To do that, it is necessary to use ``BaseServer`` and
     coordinate the three components above explicitly.
 
-    .. autoclasstoc::
-
     '''
 
     def __init__(self, applications: Mapping[str, Application | ModifyDoc] | Application | ModifyDoc,
@@ -402,7 +398,7 @@ class Server(BaseServer):
 
         if opts.num_procs > 1 and io_loop is not None:
             raise RuntimeError(
-                "Setting both num_procs and io_loop in Server is incompatible. Use BaseServer to coordinate an explicit IOLoop and multi-process HTTPServer"
+                "Setting both num_procs and io_loop in Server is incompatible. Use BaseServer to coordinate an explicit IOLoop and multi-process HTTPServer",
             )
 
         if opts.num_procs > 1 and sys.platform == "win32":
@@ -435,9 +431,13 @@ class Server(BaseServer):
             self._address = opts.address
 
             extra_websocket_origins = create_hosts_allowlist(opts.allow_websocket_origin, self.port)
+
+        self._absolute_url = server_url(self._address, self._port, opts.ssl_certfile is not None)
+
         try:
             tornado_app = BokehTornado(applications,
                                        extra_websocket_origins=extra_websocket_origins,
+                                       absolute_url=self._absolute_url,
                                        prefix=opts.prefix,
                                        index=opts.index,
                                        websocket_max_message_size_bytes=opts.websocket_max_message_size,

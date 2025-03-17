@@ -1,27 +1,33 @@
 import {GuideRenderer, GuideRendererView} from "../renderers/guide_renderer"
 import {Ticker} from "../tickers/ticker"
 import {TickFormatter} from "../formatters/tick_formatter"
-import {LabelingPolicy, AllLabels, DistanceMeasure} from "../policies/labeling"
-import {Range} from "../ranges/range"
-import * as visuals from "core/visuals"
+import type {DistanceMeasure} from "../policies/labeling"
+import {LabelingPolicy, AllLabels} from "../policies/labeling"
+import type {Range} from "../ranges/range"
+import type * as visuals from "core/visuals"
 import * as mixins from "core/property_mixins"
-import * as p from "core/properties"
-import {SerializableState} from "core/view"
-import {Side, TickLabelOrientation} from "core/enums"
-import {Size, Layoutable} from "core/layout"
+import type * as p from "core/properties"
+import type {SerializableState} from "core/view"
+import type {Side} from "core/enums"
+import {LabelOrientation} from "core/enums"
+import type {Size, Layoutable} from "core/layout"
 import {Indices} from "core/types"
-import {Panel, SideLayout, Orient} from "core/layout/side_panel"
-import {Context2d} from "core/util/canvas"
+import type {Panel, Orient} from "core/layout/side_panel"
+import {SideLayout} from "core/layout/side_panel"
+import type {Context2d} from "core/util/canvas"
 import {sum} from "core/util/array"
 import {Dict} from "core/util/object"
 import {isNumber, isPlainObject} from "core/util/types"
 import {GraphicsBoxes, TextBox} from "core/graphics"
-import {Factor, FactorRange} from "models/ranges/factor_range"
-import {BaseTextView} from "../text/base_text"
+import type {Factor} from "models/ranges/factor_range"
+import {FactorRange} from "models/ranges/factor_range"
+import type {BaseTextView} from "../text/base_text"
 import {BaseText} from "../text/base_text"
-import {build_view, IterViews} from "core/build_views"
+import type {IterViews} from "core/build_views"
+import {build_view} from "core/build_views"
 import {unreachable} from "core/util/assert"
 import {isString} from "core/util/types"
+import type {BBox} from "core/util/bbox"
 import {parse_delimited_string} from "models/text/utils"
 
 const {abs} = Math
@@ -46,6 +52,10 @@ export class AxisView extends GuideRendererView {
 
   panel: Panel
   layout: Layoutable
+
+  get bbox(): BBox {
+    return this.layout.bbox
+  }
 
   /*private*/ _axis_label_view: BaseTextView | null = null
   /*private*/ _major_label_views: Map<string | number, BaseTextView> = new Map()
@@ -197,12 +207,14 @@ export class AxisView extends GuideRendererView {
     const axis_label_graphics = this._axis_label_view.graphics()
 
     const padding = 3
+    const orient = this.model.axis_label_orientation
 
     axis_label_graphics.visuals = this.visuals.axis_label_text.values()
-    axis_label_graphics.angle = this.panel.get_label_angle_heuristic("parallel")
+    axis_label_graphics.angle = this.panel.get_label_angle_heuristic(orient)
 
-    if (isNumber(this.plot_view.base_font_size))
+    if (isNumber(this.plot_view.base_font_size)) {
       axis_label_graphics.base_font_size = this.plot_view.base_font_size
+    }
 
     const size = axis_label_graphics.size()
     const extent = this.dimension == 0 ? size.height : size.width
@@ -218,20 +230,17 @@ export class AxisView extends GuideRendererView {
     const [sx, sy] = (() => {
       const {bbox} = this.layout
       switch (this.panel.side) {
-        case "above":
-          return [bbox.hcenter, bbox.bottom]
-        case "below":
-          return [bbox.hcenter, bbox.top]
-        case "left":
-          return [bbox.right, bbox.vcenter]
-        case "right":
-          return [bbox.left, bbox.vcenter]
+        case "above": return [bbox.hcenter, bbox.bottom]
+        case "below": return [bbox.hcenter, bbox.top]
+        case "left":  return [bbox.right, bbox.vcenter]
+        case "right": return [bbox.left, bbox.vcenter]
       }
     })()
 
     const [nx, ny] = this.normals
+    const orient = this.model.axis_label_orientation
     const standoff = extents.tick + extents.tick_label + this.model.axis_label_standoff
-    const {vertical_align, align} = this.panel.get_label_text_heuristics("parallel")
+    const {vertical_align, align} = this.panel.get_label_text_heuristics(orient)
 
     const position = {
       sx: sx + nx*standoff,
@@ -243,10 +252,11 @@ export class AxisView extends GuideRendererView {
     const axis_label_graphics = this._axis_label_view.graphics()
 
     axis_label_graphics.visuals = this.visuals.axis_label_text.values()
-    axis_label_graphics.angle = this.panel.get_label_angle_heuristic("parallel")
+    axis_label_graphics.angle = this.panel.get_label_angle_heuristic(orient)
 
-    if (this.plot_view.base_font_size != null)
+    if (this.plot_view.base_font_size != null) {
       axis_label_graphics.base_font_size = this.plot_view.base_font_size
+    }
 
     axis_label_graphics.position = position
     axis_label_graphics.align = align
@@ -648,8 +658,9 @@ export namespace Axis {
     formatter: p.Property<TickFormatter>
     axis_label: p.Property<string | BaseText | null>
     axis_label_standoff: p.Property<number>
+    axis_label_orientation: p.Property<LabelOrientation | number>
     major_label_standoff: p.Property<number>
-    major_label_orientation: p.Property<TickLabelOrientation | number>
+    major_label_orientation: p.Property<LabelOrientation | number>
     major_label_overrides: p.Property<Map<string /*Cat*/ | number, string | BaseText>>
     major_label_policy: p.Property<LabelingPolicy>
     major_tick_in: p.Property<number>
@@ -702,8 +713,9 @@ export class Axis extends GuideRenderer {
       formatter:               [ Ref(TickFormatter) ],
       axis_label:              [ Nullable(Or(String, Ref(BaseText))), null],
       axis_label_standoff:     [ Int, 5 ],
+      axis_label_orientation:  [ Or(LabelOrientation, Number), "parallel" ],
       major_label_standoff:    [ Int, 5 ],
-      major_label_orientation: [ Or(TickLabelOrientation, Number), "horizontal" ],
+      major_label_orientation: [ Or(LabelOrientation, Number), "horizontal" ],
       major_label_overrides:   [ Map(Or(String, Number), Or(String, Ref(BaseText))), new globalThis.Map(), {
         convert(v: any) {
           return isPlainObject(v) ? new Dict(v) : v

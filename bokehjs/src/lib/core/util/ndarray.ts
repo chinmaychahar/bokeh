@@ -1,8 +1,12 @@
-import {NDDataType, Arrayable} from "../types"
+import type {NDDataType, Arrayable} from "../types"
 import {isObject, isNumber} from "./types"
 import {BYTE_ORDER} from "./platform"
-import {equals, Equatable, Comparator} from "./eq"
-import {serialize, Serializable, Serializer, ArrayRep, BytesRep, NDArrayRep} from "../serialization"
+import type {Equatable, Comparator} from "./eq"
+import {equals} from "./eq"
+import type {Cloner, Cloneable} from "./cloneable"
+import {clone} from "./cloneable"
+import type {Serializable, Serializer, ArrayRep, BytesRep, NDArrayRep} from "../serialization"
+import {serialize} from "../serialization"
 
 const __ndarray__ = Symbol("__ndarray__")
 
@@ -17,7 +21,7 @@ function encode_NDArray(array: NDArray, serializer: Serializer): NDArrayRep {
   }
 }
 
-export interface NDArrayType<T, U=T> extends Arrayable<U>, Equatable, Serializable {
+export interface NDArrayType<T, U=T> extends Arrayable<U>, Equatable, Cloneable, Serializable {
   readonly [__ndarray__]: boolean
   readonly dtype: NDDataType
   readonly shape: number[]
@@ -42,6 +46,10 @@ export class BoolNDArray extends Uint8Array implements NDArrayType<boolean, numb
 
   [equals](that: this, cmp: Comparator): boolean {
     return cmp.eq(this.shape, that.shape) && cmp.arrays(this, that)
+  }
+
+  [clone](cloner: Cloner): this {
+    return new BoolNDArray(this, cloner.clone(this.shape)) as this
   }
 
   [serialize](serializer: Serializer): unknown {
@@ -69,6 +77,10 @@ export class Uint8NDArray extends Uint8Array implements NDArrayType<number> {
     return cmp.eq(this.shape, that.shape) && cmp.arrays(this, that)
   }
 
+  [clone](cloner: Cloner): this {
+    return new Uint8NDArray(this, cloner.clone(this.shape)) as this
+  }
+
   [serialize](serializer: Serializer): unknown {
     return encode_NDArray(this, serializer)
   }
@@ -92,6 +104,10 @@ export class Int8NDArray extends Int8Array implements NDArrayType<number> {
 
   [equals](that: this, cmp: Comparator): boolean {
     return cmp.eq(this.shape, that.shape) && cmp.arrays(this, that)
+  }
+
+  [clone](cloner: Cloner): this {
+    return new Int8NDArray(this, cloner.clone(this.shape)) as this
   }
 
   [serialize](serializer: Serializer): unknown {
@@ -119,6 +135,10 @@ export class Uint16NDArray extends Uint16Array implements NDArrayType<number> {
     return cmp.eq(this.shape, that.shape) && cmp.arrays(this, that)
   }
 
+  [clone](cloner: Cloner): this {
+    return new Uint16NDArray(this, cloner.clone(this.shape)) as this
+  }
+
   [serialize](serializer: Serializer): unknown {
     return encode_NDArray(this, serializer)
   }
@@ -142,6 +162,10 @@ export class Int16NDArray extends Int16Array implements NDArrayType<number> {
 
   [equals](that: this, cmp: Comparator): boolean {
     return cmp.eq(this.shape, that.shape) && cmp.arrays(this, that)
+  }
+
+  [clone](cloner: Cloner): this {
+    return new Int16NDArray(this, cloner.clone(this.shape)) as this
   }
 
   [serialize](serializer: Serializer): unknown {
@@ -169,6 +193,10 @@ export class Uint32NDArray extends Uint32Array implements NDArrayType<number> {
     return cmp.eq(this.shape, that.shape) && cmp.arrays(this, that)
   }
 
+  [clone](cloner: Cloner): this {
+    return new Uint32NDArray(this, cloner.clone(this.shape)) as this
+  }
+
   [serialize](serializer: Serializer): unknown {
     return encode_NDArray(this, serializer)
   }
@@ -192,6 +220,10 @@ export class Int32NDArray extends Int32Array implements NDArrayType<number> {
 
   [equals](that: this, cmp: Comparator): boolean {
     return cmp.eq(this.shape, that.shape) && cmp.arrays(this, that)
+  }
+
+  [clone](cloner: Cloner): this {
+    return new Int32NDArray(this, cloner.clone(this.shape)) as this
   }
 
   [serialize](serializer: Serializer): unknown {
@@ -219,6 +251,10 @@ export class Float32NDArray extends Float32Array implements NDArrayType<number> 
     return cmp.eq(this.shape, that.shape) && cmp.arrays(this, that)
   }
 
+  [clone](cloner: Cloner): this {
+    return new Float32NDArray(this, cloner.clone(this.shape)) as this
+  }
+
   [serialize](serializer: Serializer): unknown {
     return encode_NDArray(this, serializer)
   }
@@ -242,6 +278,10 @@ export class Float64NDArray extends Float64Array implements NDArrayType<number> 
 
   [equals](that: this, cmp: Comparator): boolean {
     return cmp.eq(this.shape, that.shape) && cmp.arrays(this, that)
+  }
+
+  [clone](cloner: Cloner): this {
+    return new Float64NDArray(this, cloner.clone(this.shape)) as this
   }
 
   [serialize](serializer: Serializer): unknown {
@@ -284,6 +324,10 @@ export class ObjectNDArray<T=unknown> extends Array<T> implements NDArrayType<T>
 
   [equals](that: this, cmp: Comparator): boolean {
     return cmp.eq(this.shape, that.shape) && cmp.arrays(this, that)
+  }
+
+  [clone](cloner: Cloner): this {
+    return new ObjectNDArray(this, cloner.clone(this.shape)) as this
   }
 
   [serialize](serializer: Serializer): unknown {

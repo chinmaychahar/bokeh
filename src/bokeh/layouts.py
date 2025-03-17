@@ -29,9 +29,7 @@ from typing import (
     Callable,
     Iterable,
     Iterator,
-    List,
     Sequence,
-    Type,
     TypeVar,
     Union,
     overload,
@@ -39,6 +37,7 @@ from typing import (
 
 # Bokeh imports
 from .core.enums import Location, LocationType, SizingModeType
+from .core.property.singletons import Undefined, UndefinedType
 from .models import (
     Column,
     CopyTool,
@@ -58,6 +57,7 @@ from .models import (
     UIElement,
 )
 from .util.dataclasses import dataclass
+from .util.warnings import warn
 
 if TYPE_CHECKING:
     from typing_extensions import TypeAlias
@@ -266,7 +266,7 @@ def gridplot(
         children = []
 
     # Make the grid
-    tools: list[Tool | ToolProxy] = []
+    toolbars: list[Toolbar] = []
     items: list[tuple[UIElement, int, int]] = []
 
     for y, row in enumerate(children):
@@ -276,7 +276,7 @@ def gridplot(
             elif isinstance(item, LayoutDOM):
                 if merge_tools:
                     for plot in item.select(dict(type=Plot)):
-                        tools.extend(plot.toolbar.tools)
+                        toolbars.append(plot.toolbar)
                         plot.toolbar_location = None
 
                 if width is not None:
@@ -299,8 +299,56 @@ def gridplot(
         else:
             return None
 
-    toolbar = Toolbar(tools=tools if not merge_tools else group_tools(tools, merge=merge), **toolbar_options)
-    return GridPlot(children=items, toolbar=toolbar, toolbar_location=toolbar_location, sizing_mode=sizing_mode)
+    tools: list[Tool | ToolProxy] = []
+
+    for toolbar in toolbars:
+        tools.extend(toolbar.tools)
+
+    if merge_tools:
+        tools = group_tools(tools, merge=merge)
+
+    logos = [ toolbar.logo for toolbar in toolbars ]
+    active_drags = [ toolbar.active_drag for toolbar in toolbars ]
+    active_inspects = [ toolbar.active_inspect for toolbar in toolbars ]
+    active_scrolls = [ toolbar.active_scroll for toolbar in toolbars ]
+    active_taps = [ toolbar.active_tap for toolbar in toolbars ]
+    active_multis = [ toolbar.active_multi for toolbar in toolbars ]
+
+    T = TypeVar("T")
+    def assert_unique(values: list[T], name: str) -> T | UndefinedType:
+        n = len(set(values))
+        if n == 0:
+            return Undefined
+        elif n > 1:
+            warn(f"found multiple competing values for 'toolbar.{name}' property; using the latest value")
+        return values[-1]
+
+    logo = assert_unique(logos, "logo")
+    active_drag = assert_unique(active_drags, "active_drag")
+    active_inspect = assert_unique(active_inspects, "active_inspect")
+    active_scroll = assert_unique(active_scrolls, "active_scroll")
+    active_tap = assert_unique(active_taps, "active_tap")
+    active_multi = assert_unique(active_multis, "active_multi")
+
+    toolbar = Toolbar(
+        tools=tools,
+        logo=logo,
+        active_drag=active_drag,
+        active_inspect=active_inspect,
+        active_scroll=active_scroll,
+        active_tap=active_tap,
+        active_multi=active_multi,
+        **toolbar_options,
+    )
+
+    gp = GridPlot(
+        children=items,
+        toolbar=toolbar,
+        toolbar_location=toolbar_location,
+        sizing_mode=sizing_mode,
+    )
+
+    return gp
 
 # XXX https://github.com/python/mypy/issues/731
 @overload
@@ -502,7 +550,7 @@ def grid(children: Any = [], sizing_mode: SizingModeType | None = None, nrows: i
 #-----------------------------------------------------------------------------
 
 T = TypeVar("T", bound=Tool)
-MergeFn: TypeAlias = Callable[[Type[T], List[T]], Union[Tool, ToolProxy, None]]
+MergeFn: TypeAlias = Callable[[type[T], list[T]], Union[Tool, ToolProxy, None]]
 
 def group_tools(tools: list[Tool | ToolProxy], *, merge: MergeFn[Tool] | None = None,
         ignore: set[str] | None = None) -> list[Tool | ToolProxy]:
@@ -600,7 +648,7 @@ def _create_grid(iterable: Iterable[UIElement | list[UIElement]], sizing_mode: S
         else:
             raise ValueError(
                 f"""Only LayoutDOM items can be inserted into a layout.
-                Tried to insert: {item} of type {type(item)}"""
+                Tried to insert: {item} of type {type(item)}""",
             )
     if layer % 2 == 0:
         return column(children=return_list, sizing_mode=sizing_mode, **kwargs)

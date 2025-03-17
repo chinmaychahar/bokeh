@@ -1,12 +1,13 @@
 import {column, display, fig, row} from "./_util"
 
 import {ColumnDataSource, GlyphRenderer, Circle} from "@bokehjs/models"
-import {ColorNDArray} from "@bokehjs/api/glyph_api"
-import {OutputBackend} from "@bokehjs/core/enums"
+import type {ColorNDArray} from "@bokehjs/api/glyph_api"
+import type {OutputBackend} from "@bokehjs/core/enums"
 import * as nd from "@bokehjs/core/util/ndarray"
 import {isArrayable} from "@bokehjs/core/util/types"
-import {Value, Vector} from "@bokehjs/core/vectorization"
-import {Color, Arrayable} from "@bokehjs/core/types"
+import type {Value, Vector} from "@bokehjs/core/vectorization"
+import type {Color, Arrayable} from "@bokehjs/core/types"
+import {settings} from "@bokehjs/core/settings"
 
 type ColorArg = Value<Color | null> | Arrayable<Color | null> | ColorNDArray
 type AlphaArg = Value<number> | Arrayable<number>
@@ -183,6 +184,14 @@ describe("Color support", () => {
       p.block({x, y: 0, width, height, fill_color: null, hatch_pattern: "@", hatch_color: color, hatch_alpha: alpha})
       return p
     }
-    await display(row([p("canvas"), p("svg"), p("webgl")]))
+
+    // TODO: MultiLine doesn't support webgl
+    const {force_webgl} = settings
+    settings.force_webgl = false
+    try {
+      await display(row([p("canvas"), p("svg"), p("webgl")]))
+    } finally {
+      settings.force_webgl = force_webgl
+    }
   })
 })

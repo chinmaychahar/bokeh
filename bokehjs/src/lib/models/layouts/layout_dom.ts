@@ -1,20 +1,24 @@
-import {UIElement, UIElementView, DOMBoxSizing} from "../ui/ui_element"
+import type {DOMBoxSizing} from "../ui/ui_element"
+import {UIElement, UIElementView} from "../ui/ui_element"
 import {Menu} from "../menus/menu"
 import {logger} from "core/logging"
 import {Signal} from "core/signaling"
 import {Align, Dimensions, FlowMode, SizingMode} from "core/enums"
-import {remove, px, CSSOurStyles} from "core/dom"
-import {Display} from "core/css"
-import {isNumber, isArray} from "core/util/types"
-import * as p from "core/properties"
+import type {CSSOurStyles} from "core/dom"
+import {remove, px} from "core/dom"
+import type {Display} from "core/css"
+import {isNumber, isArray, isNotNull} from "core/util/types"
+import type * as p from "core/properties"
 
-import {build_views, ViewStorage, IterViews} from "core/build_views"
-import {DOMElementView} from "core/dom_view"
-import {Layoutable, SizingPolicy, Percent} from "core/layout"
+import type {ViewStorage, IterViews} from "core/build_views"
+import {build_views} from "core/build_views"
+import type {DOMElementView} from "core/dom_view"
+import type {Layoutable, Percent} from "core/layout"
+import {SizingPolicy} from "core/layout"
 import {defer} from "core/util/defer"
 import {CanvasLayer} from "core/util/canvas"
 import {unreachable} from "core/util/assert"
-import {SerializableState} from "core/view"
+import type {SerializableState} from "core/view"
 
 export {type DOMBoxSizing}
 
@@ -117,7 +121,10 @@ export abstract class LayoutDOMView extends UIElementView {
   abstract get child_models(): UIElement[]
 
   get child_views(): UIElementView[] {
-    return this.child_models.map((child) => this._child_views.get(child)!)
+    // TODO In case of a race condition somewhere between layout, resize and children updates,
+    // child_models and _child_views may be temporarily inconsistent, resulting in undefined
+    // values. Eventually this shouldn't happen and undefined should be treated as a bug.
+    return this.child_models.map((child) => this._child_views.get(child)).filter(isNotNull)
   }
 
   get layoutable_views(): LayoutDOMView[] {
@@ -366,6 +373,8 @@ export abstract class LayoutDOMView extends UIElementView {
     this._measure_layout()
   }
 
+  private _layout_computed: boolean = false
+
   compute_layout(): void {
     if (this.parent instanceof LayoutDOMView) { // TODO: this.is_managed
       this.parent.compute_layout()
@@ -375,6 +384,7 @@ export abstract class LayoutDOMView extends UIElementView {
       this._compute_layout()
       this.after_layout()
     }
+    this._layout_computed = true
   }
 
   protected _compute_layout(): void {
@@ -495,12 +505,18 @@ export abstract class LayoutDOMView extends UIElementView {
   }
 
   override has_finished(): boolean {
-    if (!super.has_finished())
+    if (!super.has_finished()) {
       return false
+    }
+
+    if (this.is_layout_root && !this._layout_computed) {
+      return false
+    }
 
     for (const child_view of this.child_views) {
-      if (!child_view.has_finished())
+      if (!child_view.has_finished()) {
         return false
+      }
     }
 
     return true
@@ -591,7 +607,7 @@ export abstract class LayoutDOMView extends UIElementView {
 
     for (const view of this.child_views) {
       const region = view.export(type, hidpi)
-      const {x, y} = view.bbox
+      const {x, y} = view.bbox.scale(composite.pixel_ratio)
       composite.ctx.drawImage(region.canvas, x, y)
     }
 

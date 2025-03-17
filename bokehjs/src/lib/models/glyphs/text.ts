@@ -1,16 +1,20 @@
-import {XYGlyph, XYGlyphView, XYGlyphData} from "./xy_glyph"
-import {PointGeometry} from "core/geometry"
+import type {XYGlyphData} from "./xy_glyph"
+import {XYGlyph, XYGlyphView} from "./xy_glyph"
+import type {PointGeometry} from "core/geometry"
 import * as mixins from "core/property_mixins"
-import * as visuals from "core/visuals"
+import type * as visuals from "core/visuals"
 import * as p from "core/properties"
 import {UniformScalar, UniformVector} from "core/uniforms"
-import {Context2d} from "core/util/canvas"
+import type {Context2d} from "core/util/canvas"
 import {Selection} from "../selections/selection"
-import {XY, LRTB, Corners, BBox} from "core/util/bbox"
+import type {XY, LRTB, Corners} from "core/util/bbox"
+import {BBox} from "core/util/bbox"
 import {enumerate} from "core/util/iterator"
-import {rotate_around, AffineTransform, Rect} from "core/util/affine"
+import type {Rect} from "core/util/affine"
+import {rotate_around, AffineTransform} from "core/util/affine"
 import {TextBox} from "core/graphics"
-import {TextAnchor, BorderRadius, Padding} from "../common/kinds"
+import type {TextAnchor} from "../common/kinds"
+import {BorderRadius, Padding} from "../common/kinds"
 import * as resolve from "../common/resolve"
 import {round_rect} from "../common/painting"
 
@@ -39,10 +43,11 @@ export class TextView extends XYGlyphView {
   declare model: Text
   declare visuals: Text.Visuals
 
-  protected override _set_data(indices: number[] | null): void {
-    super._set_data(indices)
+  override after_visuals(): void {
+    super.after_visuals()
 
-    this.labels = Array.from(this.text, (value) => {
+    const {text} = this.base ?? this
+    this.labels = Array.from(text, (value) => {
       if (value == null) {
         return null
       } else {
@@ -50,13 +55,9 @@ export class TextView extends XYGlyphView {
         return new TextBox({text})
       }
     })
-  }
-
-  override after_visuals(): void {
-    super.after_visuals()
 
     const n = this.data_size
-    const {anchor} = this
+    const {anchor} = this.base ?? this
     const {padding, border_radius} = this.model
 
     const {text_align, text_baseline} = this.visuals.text
@@ -101,10 +102,10 @@ export class TextView extends XYGlyphView {
   }
 
   protected _render(ctx: Context2d, indices: number[], data?: TextData): void {
-    const {sx, sy, x_offset, y_offset, angle, labels} = data ?? this
+    const {sx, sy, x_offset, y_offset, angle} = data ?? this
     const {text, background_fill, background_hatch, border_line} = this.visuals
     const {anchor_: anchor, border_radius, padding} = this
-    const {swidth, sheight} = this
+    const {labels, swidth, sheight} = this
 
     for (const i of indices) {
       const sx_i = sx[i] + x_offset.get(i)

@@ -49,6 +49,7 @@ from ..core.enums import (
     Anchor,
     Dimension,
     Dimensions,
+    KeyModifier,
     SelectionMode,
     ToolIcon,
     TooltipAttachment,
@@ -80,8 +81,10 @@ from ..core.properties import (
     Regex,
     Seq,
     String,
+    Struct,
     Tuple,
 )
+from ..core.property.struct import Optional
 from ..core.validation import error
 from ..core.validation.errors import (
     INCOMPATIBLE_BOX_EDIT_RENDERER,
@@ -545,7 +548,23 @@ class WheelZoomTool(Scroll):
 
     zoom_on_axis = Bool(default=True, help="""
     Whether scrolling on an axis (outside the central plot area) should zoom
-    that dimension.
+    that dimension. If enabled, the behavior of this feature can be configured
+    with ``zoom_together`` property.
+    """)
+
+    zoom_together = Enum("none", "cross", "all", default="all", help="""
+    Defines the behavior of the tool when zooming on an axis:
+
+    - ``"none"``
+        zoom only the axis that's being interacted with. Any cross
+        axes nor any other axes in the dimension of this axis will be affected.
+    - ``"cross"``
+        zoom the axis that's being interacted with and its cross
+        axis, if configured. No other axes in this or cross dimension will be
+        affected.
+    - ``"all"``
+        zoom all axes in the dimension of the axis that's being
+        interacted with. All cross axes will be unaffected.
     """)
 
     speed = Float(default=1/600, help="""
@@ -675,6 +694,16 @@ class TapTool(Tap, SelectTool):
     Specifies which kind of gesture will be used to trigger the tool,
     either a single or double tap.
     """)
+
+    modifiers = Struct(shift=Optional(Bool), ctrl=Optional(Bool), alt=Optional(Bool), default={}, help="""
+    Allows to configure a combination of modifier keys, which need to
+    be pressed during the selected gesture for this tool to trigger.
+
+    .. warning::
+        Configuring modifiers is a platform dependent feature and
+        can make this tool unsable for example on mobile devices.
+
+    """).accepts(Enum(KeyModifier), lambda key_mod: {key_mod: True})
 
     callback = Nullable(Instance(Callback), help="""
     A callback to execute *whenever a glyph is "hit"* by a mouse click
@@ -852,7 +881,20 @@ class BoxZoomTool(Drag):
     (top-left or bottom-right depending on direction) or the center of the box.
     """)
 
-class ZoomInTool(PlotActionTool):
+@abstract
+class ZoomBaseTool(PlotActionTool):
+    """ Abstract base class for zoom action tools. """
+
+    # explicit __init__ to support Init signatures
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+    renderers = Either(Auto, List(Instance(DataRenderer)), default="auto", help="""
+    Restrict zoom to ranges used by the provided data renderers. If ``"auto"``
+    then all ranges provided by the cartesian frame will be used.
+    """)
+
+class ZoomInTool(ZoomBaseTool):
     ''' *toolbar icon*: |zoom_in_icon|
 
     The zoom-in tool allows users to click a button to zoom in
@@ -880,7 +922,7 @@ class ZoomInTool(PlotActionTool):
     Percentage to zoom for each click of the zoom-in tool.
     """)
 
-class ZoomOutTool(PlotActionTool):
+class ZoomOutTool(ZoomBaseTool):
     ''' *toolbar icon*: |zoom_out_icon|
 
     The zoom-out tool allows users to click a button to zoom out
@@ -965,7 +1007,7 @@ DEFAULT_POLY_OVERLAY = InstanceDefault(PolyAnnotation,
     line_color="black",
     line_alpha=1.0,
     line_width=2,
-    line_dash=[4, 4]
+    line_dash=[4, 4],
 )
 
 class LassoSelectTool(Drag, RegionSelectTool):
@@ -1156,7 +1198,7 @@ class HoverTool(InspectTool):
             ("foo", "@foo"),
             ("bar", "@bar"),
             ("baz", "@baz{safe}"),
-            ("total", "@total{$0,0.00}"
+            ("total", "@total{$0,0.00}"),
         ]
 
     You can also supply a ``Callback`` to the ``HoverTool``, to build custom
@@ -1364,7 +1406,7 @@ class HoverTool(InspectTool):
     """)
 
 DEFAULT_HELP_TIP = "Click the question mark to learn more about Bokeh plot tools."
-DEFAULT_HELP_URL = "https://docs.bokeh.org/en/latest/docs/user_guide/tools.html"
+DEFAULT_HELP_URL = "https://docs.bokeh.org/en/latest/docs/user_guide/interaction/tools.html"
 
 class HelpTool(ActionTool):
     ''' A button tool to provide a "help" link to users.
@@ -1549,7 +1591,7 @@ class PointDrawTool(EditTool, Drag, Tap):
     ''' *toolbar icon*: |point_draw_icon|
 
     The PointDrawTool allows adding, dragging and deleting point-like glyphs
-    (i.e subclasses of``XYGlyph``) on one or more renderers by editing the
+    (i.e subclasses of ``XYGlyph``) on one or more renderers by editing the
     underlying ``ColumnDataSource`` data. Like other drawing tools, the
     renderers that are to be edited must be supplied explicitly as a list. Any
     newly added points will be inserted on the ``ColumnDataSource`` of the
@@ -1726,7 +1768,7 @@ class PolyEditTool(PolyTool, Drag, Tap):
 
     The tool will modify the columns on the data source corresponding to the
     ``xs`` and ``ys`` values of the glyph. Any additional columns in the data
-    source will be padded with the declared``empty_value``, when adding a new
+    source will be padded with the declared ``empty_value``, when adding a new
     point.
 
     The supported actions include:
@@ -1775,7 +1817,7 @@ class LineEditTool(EditTool, Drag, Tap):
 
     The tool will modify the columns on the data source corresponding to the
     ``x`` and ``y`` values of the glyph. Any additional columns in the data
-    source will be padded with the declared``empty_value``, when adding a new
+    source will be padded with the declared ``empty_value``, when adding a new
     point.
 
     The supported actions include:

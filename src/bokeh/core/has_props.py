@@ -37,7 +37,6 @@ from typing import (
     Iterable,
     Literal,
     NoReturn,
-    Type,
     TypedDict,
     TypeVar,
     Union,
@@ -67,7 +66,7 @@ from .serialization import (
 from .types import ID
 
 if TYPE_CHECKING:
-    from typing_extensions import TypeAlias
+    from typing_extensions import NotRequired, TypeAlias
 
     from ..client.session import ClientSession
     from ..server.session import ServerSession
@@ -97,7 +96,7 @@ __all__ = (
 if TYPE_CHECKING:
     Setter: TypeAlias = Union[ClientSession, ServerSession]
 
-C = TypeVar("C", bound=Type["HasProps"])
+C = TypeVar("C", bound=type["HasProps"])
 
 def abstract(cls: C) -> C:
     ''' A decorator to mark abstract base classes derived from |HasProps|.
@@ -213,7 +212,7 @@ class MetaHasProps(type):
         redeclared = own_properties.keys() & base_properties.keys()
         if redeclared:
             warn(f"Properties {redeclared!r} in class {cls.__name__} were previously declared on a parent "
-                 "class. It never makes sense to do this. Redundant properties should be deleted here, or on"
+                 "class. It never makes sense to do this. Redundant properties should be deleted here, or on "
                  "the parent class. Override() can be used to change a default value of a base class property.",
                  RuntimeWarning)
 
@@ -237,8 +236,6 @@ class NonQualified:
 
 class HasProps(Serializable, metaclass=MetaHasProps):
     ''' Base class for all class types that have Bokeh properties.
-
-    .. autoclasstoc::
 
     '''
     _initialized: bool = False
@@ -297,7 +294,10 @@ class HasProps(Serializable, metaclass=MetaHasProps):
                 continue
             setattr(self, name, value)
 
-        for name in self.properties() - set(properties.keys()):
+        initialized = set(properties.keys())
+        for name in self.properties(_with_props=True): # avoid set[] for deterministic behavior
+            if name in initialized:
+                continue
             desc = self.lookup(name)
             if desc.has_unstable_default(self):
                 desc._get(self) # this fills-in `_unstable_*_values`
@@ -748,23 +748,21 @@ class HasProps(Serializable, metaclass=MetaHasProps):
 
 KindRef = Any # TODO
 
-class _PropertyDef(TypedDict):
+class PropertyDef(TypedDict):
     name: str
     kind: KindRef
-class PropertyDef(_PropertyDef, total=False):
-    default: Any
+    default: NotRequired[Any]
 
 class OverrideDef(TypedDict):
     name: str
     default: Any
 
-class _ModelDef(TypedDict):
+class ModelDef(TypedDict):
     type: Literal["model"]
     name: str
-class ModelDef(_ModelDef, total=False):
-    extends: Ref | None
-    properties: list[PropertyDef]
-    overrides: list[OverrideDef]
+    extends: NotRequired[Ref | None]
+    properties: NotRequired[list[PropertyDef]]
+    overrides: NotRequired[list[OverrideDef]]
 
 def _HasProps_to_serializable(cls: type[HasProps], serializer: Serializer) -> Ref | ModelDef:
     from ..model import DataModel, Model

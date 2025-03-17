@@ -43,6 +43,7 @@ PKG_JS = PKG_STATIC / 'js'
 PKG_TSLIB = PKG_STATIC / 'lib'
 COMPONENTS = ("bokeh", "bokeh-widgets", "bokeh-tables", "bokeh-api", "bokeh-gl", "bokeh-mathjax")
 JS_FILES = [f"{c}{m}.js" for c, m in product(COMPONENTS, ("", ".min"))]
+PACKAGED = (ROOT / 'PKG-INFO').exists()
 
 def build_js() -> None:
     print("\nBuilding BokehJS... ", end="")
@@ -83,16 +84,18 @@ def install_js(packages: list[str]) -> None:
     if missing:
         die(BOKEHJS_INSTALL_FAIL.format(missing=", ".join(missing)))
 
-    if PKG_JS.exists():
-        rmtree(PKG_JS)
-    copytree(BUILD_JS, PKG_JS)
+    if not PKG_JS.is_symlink():
+        if PKG_JS.exists():
+            rmtree(PKG_JS)
+        copytree(BUILD_JS, PKG_JS)
 
-    if PKG_TSLIB.exists():
-        rmtree(PKG_TSLIB)
-    if BUILD_TSLIB.exists():
-        PKG_TSLIB.mkdir()
-        for lib_file in BUILD_TSLIB.glob("lib.*.d.ts"):
-            copy(lib_file, PKG_TSLIB)
+    if not PKG_TSLIB.is_symlink():
+        if PKG_TSLIB.exists():
+            rmtree(PKG_TSLIB)
+        if BUILD_TSLIB.exists():
+            PKG_TSLIB.mkdir()
+            for lib_file in BUILD_TSLIB.glob("lib.*.d.ts"):
+                copy(lib_file, PKG_TSLIB)
 
     new = set(
         ".".join([*Path(parent).relative_to(SRC_ROOT).parts, d])
@@ -105,7 +108,7 @@ def install_js(packages: list[str]) -> None:
 
 def build_or_install_bokehjs(packages: list[str]) -> None:
     action = os.environ.get("BOKEHJS_ACTION", "build")
-    if (ROOT / 'PKG-INFO').exists():
+    if PACKAGED:
         kind, loc = "PACKAGED", "bokeh.server.static"
     elif action == "install":
         kind, loc = "PREVIOUSLY BUILT", "bokehjs/build"
@@ -119,12 +122,13 @@ def build_or_install_bokehjs(packages: list[str]) -> None:
     print(f"Used {bright(yellow(kind))} BokehJS from {loc}\n")
 
 def check_tags() -> None:
-    try:
-        tags = subprocess.check_output(("git", "tag", "-l")).split()
-        if len(tags) < 5: # arbitrary "too-low" cutoff, there will always be more than 5 tags, if there are any
-            die(bright(red(MISSING_TAGS)))
-    except Exception:
-        print(bright(yellow("!!! Could not check repo tags. Please ensure full tag history")))
+    if not PACKAGED:
+        try:
+            tags = subprocess.check_output(("git", "tag", "-l")).split()
+            if len(tags) < 5: # arbitrary "too-low" cutoff, there will always be more than 5 tags, if there are any
+                die(bright(red(MISSING_TAGS)))
+        except Exception:
+            print(bright(yellow("!!! Could not check repo tags. Please ensure full tag history")))
 
 def die(x: str) -> NoReturn:
     print(f"{x}\n")
@@ -166,6 +170,7 @@ class EditableWheel(editable_wheel):  # type: ignore
 
 class Sdist(sdist):  # type: ignore
     def run(self) -> None:
+        check_tags()
         build_or_install_bokehjs(self.distribution.packages)
         super().run()
 

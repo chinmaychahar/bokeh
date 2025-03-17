@@ -1,16 +1,23 @@
 import {display, row, with_internal} from "./_util"
 
+import type {Axis} from "@bokehjs/models"
 import {
-  Axis, LinearAxis, LogAxis, CategoricalAxis,
-  LinearScale, LogScale, CategoricalScale,
-  Range1d, FactorRange,
-  AllLabels, NoOverlap,
+  AllLabels,
+  CategoricalAxis,
+  CategoricalScale,
+  FactorRange,
+  LinearAxis,
+  LinearScale,
+  LogAxis,
+  LogScale,
+  NoOverlap,
   Plot,
+  Range1d,
   TeX,
 } from "@bokehjs/models"
 
-import {Factor} from "@bokehjs/models/ranges/factor_range"
-import {OutputBackend, Side} from "@bokehjs/core/enums"
+import type {Factor} from "@bokehjs/models/ranges/factor_range"
+import type {OutputBackend, Side} from "@bokehjs/core/enums"
 import {radians} from "@bokehjs/core/util/math"
 
 (() => {
@@ -153,6 +160,10 @@ import {radians} from "@bokehjs/core/util/math"
 
     it("should support multiple line axis_label with axis_label_text_align=right", async () => {
       await plot({axis_label: multiline_axis_label, axis_label_text_align: "right"}, {minor_size: 100})
+    })
+
+    it("should support single line axis_label and axis_label_orientation=normal", async () => {
+      await plot({axis_label: multiline_axis_label, axis_label_orientation: "normal"}, {minor_size: 200})
     })
 
     it("should support major_label_policy=AllLables with major_label_orientation=parallel", async () => {

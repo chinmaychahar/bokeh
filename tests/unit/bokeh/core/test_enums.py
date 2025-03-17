@@ -55,6 +55,8 @@ ALL  = (
     'HorizontalLocation',
     'ImageOrigin',
     'JitterRandomDistribution',
+    'KeyModifier',
+    'LabelOrientation',
     'LatLon',
     'LegendClickPolicy',
     'LegendLocation',
@@ -85,7 +87,6 @@ ALL  = (
     'TextAlign',
     'TextBaseline',
     'TextureRepetition',
-    'TickLabelOrientation',
     'ToolIcon',
     'TooltipAttachment',
     'TooltipFieldFormatter',
@@ -193,7 +194,7 @@ class Test_bce:
         assert tuple(bce.HatchPattern) == (
             "blank", "dot", "ring", "horizontal_line", "vertical_line", "cross", "horizontal_dash", "vertical_dash",
             "spiral", "right_diagonal_line", "left_diagonal_line", "diagonal_cross", "right_diagonal_dash",
-            "left_diagonal_dash", "horizontal_wave", "vertical_wave", "criss_cross"
+            "left_diagonal_dash", "horizontal_wave", "vertical_wave", "criss_cross",
         )
 
     def test_HatchPatternAbbreviation(self) -> None:
@@ -210,6 +211,12 @@ class Test_bce:
 
     def test_JitterRandomDistribution(self) -> None:
         assert tuple(bce.JitterRandomDistribution) == ("uniform", "normal")
+
+    def test_KeyModifier(self) -> None:
+        assert tuple(bce.KeyModifier) == ("shift", "ctrl", "alt")
+
+    def test_LabelOrientation(self) -> None:
+        assert tuple(bce.LabelOrientation) == ("horizontal", "vertical", "parallel", "normal")
 
     def test_LatLon(self) -> None:
         assert tuple(bce.LatLon) == ("lat", "lon")
@@ -307,9 +314,6 @@ class Test_bce:
     def test_TextureRepetition(self) -> None:
         assert tuple(bce.TextureRepetition) == ("repeat", "repeat_x", "repeat_y", "no_repeat")
 
-    def test_TickLabelOrientation(self) -> None:
-        assert tuple(bce.TickLabelOrientation) == ("horizontal", "vertical", "parallel", "normal")
-
     def test_ToolIcon(self) -> None:
         assert tuple(bce.ToolIcon) == ("append_mode", "box_edit", "box_select", "box_zoom", "clear_selection",
             "copy", "crosshair", "freehand_draw", "help", "hover", "intersect_mode", "lasso_select",
@@ -356,6 +360,8 @@ def test_enums_contents() -> None:
         'HorizontalLocation',
         'ImageOrigin',
         'JitterRandomDistribution',
+        'KeyModifier',
+        'LabelOrientation',
         'LatLon',
         'LegendClickPolicy',
         'LegendLocation',
@@ -386,7 +392,6 @@ def test_enums_contents() -> None:
         'TextAlign',
         'TextBaseline',
         'TextureRepetition',
-        'TickLabelOrientation',
         'ToolIcon',
         'TooltipAttachment',
         'TooltipFieldFormatter',

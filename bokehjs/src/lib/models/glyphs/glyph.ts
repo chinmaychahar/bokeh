@@ -1,26 +1,31 @@
-import {HitTestResult} from "core/hittest"
+import type {HitTestResult} from "core/hittest"
 import * as p from "core/properties"
 import * as bbox from "core/util/bbox"
 import * as visuals from "core/visuals"
-import * as geometry from "core/geometry"
-import {Context2d} from "core/util/canvas"
+import type * as geometry from "core/geometry"
+import {settings} from "core/settings"
+import type {Context2d} from "core/util/canvas"
 import {View} from "core/view"
 import {Model} from "../../model"
-import {Anchor} from "core/enums"
-import {build_views, ViewStorage, IterViews} from "core/build_views"
+import type {Anchor} from "core/enums"
+import type {ViewStorage, IterViews} from "core/build_views"
+import {build_views} from "core/build_views"
 import {logger} from "core/logging"
-import {Arrayable, Rect, FloatArray, ScreenArray, Indices} from "core/types"
+import type {Arrayable, Rect, FloatArray} from "core/types"
+import {ScreenArray, Indices} from "core/types"
 import {isString} from "core/util/types"
 import {RaggedArray} from "core/util/ragged_array"
 import {inplace_map, max} from "core/util/arrayable"
 import {is_equal} from "core/util/eq"
 import {SpatialIndex} from "core/util/spatial"
-import {Scale} from "../scales/scale"
-import {FactorRange, Factor} from "../ranges/factor_range"
+import type {Scale} from "../scales/scale"
+import type {Factor} from "../ranges/factor_range"
+import {FactorRange} from "../ranges/factor_range"
 import {Selection} from "../selections/selection"
-import {GlyphRendererView} from "../renderers/glyph_renderer"
-import {ColumnarDataSource} from "../sources/columnar_data_source"
+import type {GlyphRendererView} from "../renderers/glyph_renderer"
+import type {ColumnarDataSource} from "../sources/columnar_data_source"
 import {Decoration} from "../graphics/decoration"
+import type {BaseGLGlyph, BaseGLGlyphConstructor} from "./webgl/base"
 
 const {abs, ceil} = Math
 
@@ -39,7 +44,9 @@ export abstract class GlyphView extends View {
   }
 
   /** @internal */
-  glglyph?: import("./webgl/base").BaseGLGlyph
+  glglyph?: BaseGLGlyph
+
+  async load_glglyph?(): Promise<typeof BaseGLGlyph>
 
   get has_webgl(): boolean {
     return this.glglyph != null
@@ -60,11 +67,16 @@ export abstract class GlyphView extends View {
   }
 
   get data_size(): number {
-    const {_data_size} = this
-    if (_data_size != null)
-      return _data_size
-    else
-      throw new Error(`${this}.set_data() wasn't called`)
+    const {base} = this
+    if (base != null) {
+      return base.data_size
+    } else {
+      const {_data_size} = this
+      if (_data_size != null)
+        return _data_size
+      else
+        throw new Error(`${this}.set_data() wasn't called`)
+    }
   }
 
   override initialize(): void {
@@ -82,6 +94,12 @@ export abstract class GlyphView extends View {
   override async lazy_initialize(): Promise<void> {
     await super.lazy_initialize()
     await build_views(this.decorations, this.model.decorations, {parent: this.parent})
+
+    const {webgl} = this.canvas
+    if (webgl != null && this.load_glglyph != null) {
+      const cls = await this.load_glglyph() as BaseGLGlyphConstructor
+      this.glglyph = new cls(webgl.regl_wrapper, this)
+    }
   }
 
   request_render(): void {
@@ -94,12 +112,12 @@ export abstract class GlyphView extends View {
 
   render(ctx: Context2d, indices: number[], data?: GlyphData): void {
     if (this.glglyph != null) {
-      this.renderer.needs_webgl_blit = this.glglyph.render(ctx, indices, this.base ?? this)
-      if (this.renderer.needs_webgl_blit)
-        return
+      this.glglyph.render(ctx, indices, this.base ?? this)
+    } else if (this.canvas.webgl != null && settings.force_webgl) {
+      throw new Error(`${this} doesn't support webgl rendering`)
+    } else {
+      this._render(ctx, indices, data ?? this.base)
     }
-
-    this._render(ctx, indices, data ?? this.base)
   }
 
   protected abstract _render(ctx: Context2d, indices: number[], data?: GlyphData): void
@@ -332,7 +350,7 @@ export abstract class GlyphView extends View {
    */
   after_visuals(): void {}
 
-  private get _index_size(): number {
+  protected get _index_size(): number {
     return this.data_size
   }
 
@@ -374,7 +392,7 @@ export abstract class GlyphView extends View {
     }
 
     this._map_data()
-    this.glglyph?.set_data_changed()
+    this.glglyph?.set_data_mapped()
   }
 
   // This is where specs not included in coords are computed, e.g. radius.

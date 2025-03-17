@@ -1,15 +1,17 @@
 import {settings} from "core/settings"
 import {logger} from "core/logging"
-import * as p from "core/properties"
+import type * as p from "core/properties"
 import {div, append} from "core/dom"
 import {OutputBackend} from "core/enums"
 import {UIEventBus} from "core/ui_events"
 import {load_module} from "core/util/modules"
-import {Context2d, CanvasLayer} from "core/util/canvas"
+import type {Context2d} from "core/util/canvas"
+import {CanvasLayer} from "core/util/canvas"
 import {UIElement, UIElementView} from "../ui/ui_element"
-import {type PlotView} from "../plots/plot"
+import type {PlotView} from "../plots/plot"
 import type {ReglWrapper} from "../glyphs/webgl/regl_wrap"
-import {InlineStyleSheet, StyleSheetLike} from "core/dom"
+import type {StyleSheetLike} from "core/dom"
+import {InlineStyleSheet} from "core/dom"
 import canvas_css from "styles/canvas.css"
 
 export type FrameBox = [number, number, number, number]
@@ -34,7 +36,9 @@ async function init_webgl(): Promise<WebGLState | null> {
   // We use a global invisible canvas and gl context. By having a global context,
   // we avoid the limitation of max 16 contexts that most browsers have.
   const canvas = document.createElement("canvas")
-  const gl = canvas.getContext("webgl", {premultipliedAlpha: true})
+  const gl = canvas.getContext(
+    "webgl", {alpha: true, antialias: false, depth: false, premultipliedAlpha: true},
+  )
 
   // If WebGL is available, we store a reference to the ReGL wrapper on
   // the ctx object, because that's what gets passed everywhere.
@@ -173,9 +177,18 @@ export class CanvasView extends UIElementView {
     return changed
   }
 
+  override after_resize(): void {
+    if (this.plot_views.length != 0) {
+      // Canvas is being managed by a plot, thus it should not attempt
+      // self-resize, as it would result in inconsistent state and
+      // possibly invalid layout and/or lack of repaint of a plot.
+      return
+    } else {
+      super.after_resize()
+    }
+  }
+
   override _after_resize(): void {
-    if (this.plot_views.length != 0)
-      return // XXX temporary hack
     super._after_resize()
     const {width, height} = this.bbox
     this.primary.resize(width, height)
@@ -184,9 +197,7 @@ export class CanvasView extends UIElementView {
 
   resize(): void {
     this._update_bbox()
-    const {width, height} = this.bbox
-    this.primary.resize(width, height)
-    this.overlays.resize(width, height)
+    this._after_resize()
   }
 
   prepare_webgl(frame_box: FrameBox): void {
@@ -210,7 +221,7 @@ export class CanvasView extends UIElementView {
   blit_webgl(ctx: Context2d): void {
     // This should be called when the ctx has no state except the HIDPI transform
     const {webgl} = this
-    if (webgl != null) {
+    if (webgl != null && webgl.canvas.width*webgl.canvas.height > 0) {
       // Blit gl canvas into the 2D canvas. To do 1-on-1 blitting, we need
       // to remove the hidpi transform, then blit, then restore.
       // ctx.globalCompositeOperation = "source-over"  -> OK; is the default

@@ -1,13 +1,15 @@
-import {XYGlyph, XYGlyphView, XYGlyphData} from "./xy_glyph"
+import type {XYGlyphData} from "./xy_glyph"
+import {XYGlyph, XYGlyphView} from "./xy_glyph"
 import {generic_line_scalar_legend, line_interpolation} from "./utils"
-import {PointGeometry, SpanGeometry} from "core/geometry"
-import {Arrayable, Rect} from "core/types"
-import * as p from "core/properties"
+import type {PointGeometry, SpanGeometry} from "core/geometry"
+import type {Arrayable, Rect} from "core/types"
+import type * as p from "core/properties"
 import * as mixins from "core/property_mixins"
-import * as visuals from "core/visuals"
+import type * as visuals from "core/visuals"
 import * as hittest from "core/hittest"
-import {Context2d} from "core/util/canvas"
+import type {Context2d} from "core/util/canvas"
 import {Selection} from "../selections/selection"
+import type {LineGL} from "./webgl/line_gl"
 
 export type LineData = XYGlyphData & p.UniformsOf<Line.Mixins>
 
@@ -18,16 +20,11 @@ export class LineView extends XYGlyphView {
   declare visuals: Line.Visuals
 
   /** @internal */
-  declare glglyph?: import("./webgl/line_gl").LineGL
+  declare glglyph?: LineGL
 
-  override async lazy_initialize(): Promise<void> {
-    await super.lazy_initialize()
-
-    const {webgl} = this.renderer.plot_view.canvas_view
-    if (webgl != null && webgl.regl_wrapper.has_webgl) {
-      const {LineGL} = await import("./webgl/line_gl")
-      this.glglyph = new LineGL(webgl.regl_wrapper, this)
-    }
+  override async load_glglyph() {
+    const {LineGL} = await import("./webgl/line_gl")
+    return LineGL
   }
 
   protected _render(ctx: Context2d, indices: number[], data?: LineData): void {

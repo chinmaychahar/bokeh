@@ -1,8 +1,10 @@
-import noUiSlider, {API} from "nouislider"
+import type {API} from "nouislider"
+import noUiSlider from "nouislider"
 
 import * as p from "core/properties"
-import {Color} from "core/types"
-import {div, span, empty, StyleSheetLike} from "core/dom"
+import type {Color} from "core/types"
+import type {StyleSheetLike} from "core/dom"
+import {div, span, empty} from "core/dom"
 import {repeat} from "core/util/array"
 import {color2css} from "core/util/color"
 
@@ -144,6 +146,9 @@ abstract class AbstractBaseSliderView extends OrientedControlView {
         tooltip.style.display = show ? "block" : ""
       }
 
+      this._noUiSlider.on("start", () => this._toggle_user_select(false))
+      this._noUiSlider.on("end",   () => this._toggle_user_select(true))
+
       this._noUiSlider.on("start", (_, i) => toggle_tooltip(i, true))
       this._noUiSlider.on("end",   (_, i) => toggle_tooltip(i, false))
     } else {
@@ -167,6 +172,13 @@ abstract class AbstractBaseSliderView extends OrientedControlView {
     this.group_el = div({class: inputs.input_group}, this.title_el, this.slider_el)
     this.shadow_el.appendChild(this.group_el)
     this._has_finished = true
+  }
+
+  protected _toggle_user_select(enable: boolean): void {
+    const {style} = document.body
+    const value = enable ? "" : "none"
+    style.userSelect = value
+    style.webkitUserSelect = value
   }
 
   protected _slide(values: number[]): void {
